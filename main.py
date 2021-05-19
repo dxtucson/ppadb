@@ -43,13 +43,11 @@ def find_black_heart(vertical_slice: numpy.array) -> int:
                     top_check = y_start - 5
                     bottom_check = y_start + equal_count + 5
                     if top_check < feed_top:  # scroll down 10px to do the check
-                        print('Scroll down 10px and check again.')
-                        device.shell(f'input touchscreen swipe 500 2000 500 2010')
-                        return find_black_heart(vertical_slice)
+                        print('Could not verify: top_check < feed_top')
+                        return -1
                     elif bottom_check > feed_bottom:  # scroll up 10px to do the check
-                        print('Scroll up 10px and check again.')
-                        device.shell(f'input touchscreen swipe 500 2000 500 1090')
-                        return find_black_heart(vertical_slice)
+                        print('Could not verify: bottom_check > feed_bottom')
+                        return -1
                     # the potential heart has white pixels on both top and bottom
                     else:
                         for i in numpy.nditer(vertical_slice[top_check]):
