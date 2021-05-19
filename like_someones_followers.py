@@ -27,13 +27,16 @@ follow_top = 466  # top bar of follower page is taller
 feed_bottom = 2536  # bottom bar top pixel
 half_width = 720  # half of the screen width
 follow_button_x = 1050  # this point should have blue(0, 149, 246, 255) if it is follow button
-left_thin_margin = 20  # help to decide whether there is a tab indicator (thin black horizontal line)
+left_thin_margin = 5  # help to decide whether there is a tab indicator (thin black horizontal line)
 
 
 # find start Y of black heart. Return -1 if not found
-def find_black_heart(vertical_slice: numpy.array) -> int:
+def find_black_heart() -> int:
+    image = screenshot()
+    vertical_slice = image[:, 90:92]
     y_start = -1
     equal_count = 0
+
     for ay in range(numpy.shape(vertical_slice)[0]):
         if y_start == -1:  # no potential heart found so far
             if (vertical_slice[ay] == black_heart_saved[0]).all():  # this could be heart
@@ -73,7 +76,9 @@ def find_black_heart(vertical_slice: numpy.array) -> int:
     return -1
 
 
-def find_follow_button_y_array(vertical_slice: numpy.array):
+def find_follow_button_y_array():
+    image = screenshot()
+    vertical_slice = image[follow_top:feed_bottom, follow_button_x]
     follow_buttons_y = []
     # the input will have one column of pixels
     same_button = False
@@ -88,23 +93,25 @@ def find_follow_button_y_array(vertical_slice: numpy.array):
     return follow_buttons_y
 
 
-def find_first_image_y(vertical_slice: numpy.array):
+def find_first_image_y():
     # to like the first image of a user
     # find four pixels of [38, 38, 38, 255], expect one gray pixel and one white pixel
-    first_image_y = -1
+    image = screenshot()
+    vertical_slice = image[:, left_thin_margin]
+    first_y = -1
     continuous_black_pixels = 0
     for row in range(numpy.shape(vertical_slice)[0]):
         if (vertical_slice[row] == [38, 38, 38, 255]).all():
-            if first_image_y == -1:
-                first_image_y = row
+            if first_y == -1:
+                first_y = row
             continuous_black_pixels += 1
             if continuous_black_pixels > 4:
-                first_image_y = 0
+                first_y = 0
                 continuous_black_pixels = -1
         elif (vertical_slice[row] == [255, 255, 255, 255]).all():
             if continuous_black_pixels == 4:
-                return first_image_y + 240  # center_Y of the first image
-    return first_image_y
+                return first_y + 240  # center_Y of the first image
+    return first_y
 
 
 def tap_on_back():
@@ -115,7 +122,19 @@ def sleep1():
     time.sleep(1)
 
 
-while True:
+def sleep2():
+    time.sleep(2)
+
+
+def sleep5():
+    time.sleep(5)
+
+
+def scroll_a_page():
+    device.shell(f'input touchscreen swipe 500 {feed_bottom} 500 {follow_top} 2000')
+
+
+def screenshot():
     image = device.screencap()
 
     with open('screen.png', 'wb') as f:
@@ -123,40 +142,39 @@ while True:
 
     image = Image.open('screen.png')
     image = numpy.array(image, dtype=numpy.uint8)
+    return image
+
+
+while True:
 
     # find black heart
     # vertical_sample1 = image[:, 90:92]
     # result1 = find_black_heart(vertical_sample1)
 
     # find follow buttons
-    # vertical_sample2 = image[follow_top:feed_bottom, follow_button_x]
-    # result2 = find_follow_button_y_array(vertical_sample2)
-    # from 2007
+    follow_buttons_y = find_follow_button_y_array()
 
-    vertical_sample3 = image[:, left_thin_margin]
-    result3 = find_first_image_y(vertical_sample3)
+    if not follow_buttons_y:
+        # scroll a entire page
+        scroll_a_page()
+    else:
+        # click on the users found in this page
+        for y in follow_buttons_y:
+            device.shell(f'input tap {half_width} {y}')  # tap on user
+            sleep5()  # load user page
+            first_image_y = find_first_image_y()
+            if first_image_y > 0:  # found an image to like
+                device.shell(f'input tap 250 {first_image_y}')  # tap on image
+                black_heart_y = find_black_heart()
+                if black_heart_y > 0:
+                    device.shell(f'input tap 91 {black_heart_y + 10}')
+                sleep1()
+                tap_on_back()  # to user view
+                sleep2()
+                tap_on_back()  # to follower view
+            else:  # private user or no image
+                tap_on_back()
+                sleep1()
 
-    # device.shell(f'input tap {half_width} {result2[1]}')
-
-    device.shell(f'input tap 250 {result3}')
-    # tap on the first follower
-
-    # im = Image.fromarray(vertical_sample2)
-    # im.save("follow_button_slice.png")
-    # save('black_heart_slice.npy', heart_sub)
-
-    # steps to save snapshot of a heart
-    # heart_sub = image[2130:2147, 89:93]
-    # im = Image.fromarray(heart_sub)
-    # im.save("vertical_slice.png")
-    # save('black_heart_slice.npy', heart_sub)
-
-    # click on like or keep scrolling
-    # if result > 0:
-    #     device.shell(f'input tap 91 {result + 10}')
-    #     device.shell(f'input touchscreen swipe 500 2000 500 1000')
-    # else:
-    #     device.shell(f'input touchscreen swipe 500 2000 500 1500')
-    sleep1()
-    tap_on_back()
-    sleep1()
+        scroll_a_page()
+    sleep2()
