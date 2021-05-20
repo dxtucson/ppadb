@@ -4,8 +4,12 @@ import tkinter
 from tkinter import *
 from datetime import date, datetime
 
+from WorkerThread import WorkerThread
+
 
 def start_clicked():
+    t = WorkerThread()
+    t.start()
     print('start clicked')
 
 
