@@ -188,6 +188,7 @@ class WorkerThread(threading.Thread):
                         first_image_y = self.find_first_image_y()
                         if first_image_y > 0:  # found an image to like
                             self.device.shell(f'input tap 250 {first_image_y}')  # tap on image
+                            self.sleep2()
                             black_heart_y = self.find_black_heart()
                             if black_heart_y > 0:
                                 self.device.shell(f'input tap 91 {black_heart_y + 10}')
