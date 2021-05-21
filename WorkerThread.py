@@ -119,6 +119,8 @@ class WorkerThread(threading.Thread):
                     continuous_black_pixels = -1
             elif (vertical_slice[row] == [255, 255, 255, 255]).all():
                 if continuous_black_pixels == 4:
+                    if (image[first_y + 240, 240] == image[first_y + 240, 720]).all():
+                        return -1
                     return first_y + 240  # center_Y of the first image
         return first_y
 
@@ -190,12 +192,11 @@ class WorkerThread(threading.Thread):
                             self.device.shell(f'input tap 250 {first_image_y}')  # tap on image
                             self.sleep2()
                             black_heart_y = self.find_black_heart()
-                            if black_heart_y > 0:
+                            if black_heart_y > 1300: # in case the user's icon has heart
                                 self.device.shell(f'input tap 91 {black_heart_y + 10}')
                                 self.likes.set(self.likes.get() + 1)
                             if self.ui_state == UiState.stopped:
                                 break
-                            self.sleep1()
                             self.tap_on_back()  # to user view
                             self.sleep1()
                             self.tap_on_back()  # to follower view
