@@ -186,7 +186,7 @@ class WorkerThread(threading.Thread):
                         if self.ui_state == UiState.stopped:
                             break
                         self.device.shell(f'input tap {self.half_width} {y}')  # tap on user
-                        self.sleep3()  # load user page
+                        self.sleep2()  # load user page
                         first_image_y = self.find_first_image_y()
                         if first_image_y > 0:  # found an image to like
                             self.device.shell(f'input tap 250 {first_image_y}')  # tap on image
