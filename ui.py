@@ -6,9 +6,10 @@ from WorkerThread import WorkerThread
 
 
 def start_clicked():
-    global worker_thread, run_mode, rb_1, rb_2
+    global worker_thread, run_mode, rb_1, rb_2, counter_var
+
     if worker_thread is None or worker_thread.ui_state == UiState.stopped:
-        worker_thread = WorkerThread(run_mode)
+        worker_thread = WorkerThread(run_mode, counter_var)
         worker_thread.start()
         rb_1['state'] = DISABLED
         rb_2['state'] = DISABLED
@@ -62,6 +63,9 @@ c.pack()
 radio_selection = IntVar()
 radio_selection.set(2)
 
+counter_var = IntVar()
+counter_var.set(0)
+
 rb_1 = Radiobutton(root, font='Arial 11', width='12', text="Continuous", padx=20, value=1, variable=radio_selection,
                    command=selected)
 rb_1.place(x=132, y=30, width=100, height=30)
@@ -71,7 +75,8 @@ rb_2 = Radiobutton(root, font='Arial 11', width='12', text="Followers ", padx=20
 rb_2.place(x=129, y=60, width=100, height=30)
 
 c.create_text(180, 120, font='Arial 13', text='Posts you\'ve liked today:')
-c.create_text(180, 160, font='Arial 18', text='888')
+counter_label = Label(root, font='Arial 20', textvariable=counter_var)
+counter_label.place(x=180, y=160, anchor='center')
 
 start_button = Button(root, font='Arial 11', text='Start', bd='2', command=start_clicked)
 start_button.place(x=80, y=200, width=50, height=40)

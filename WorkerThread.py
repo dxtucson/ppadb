@@ -1,5 +1,7 @@
 import threading
 import time
+from tkinter import IntVar
+
 from ppadb.client import Client
 from PIL import Image
 import numpy
@@ -14,13 +16,14 @@ from UiState import UiState
 
 class WorkerThread(threading.Thread):
 
-    def __init__(self, mode: RunMode):
+    def __init__(self, mode: RunMode, count: IntVar):
         threading.Thread.__init__(self)
         self.run_mode = mode
+        self.likes = count
 
     ui_state = UiState.running
     run_mode = RunMode.followers
-
+    likes: IntVar
     # these numbers are for Pixel 2 XL
     feed_top = 97  # top bar bottom pixel
     follow_top = 466  # top bar of follower page is taller
@@ -168,6 +171,7 @@ class WorkerThread(threading.Thread):
                 black_heart_y = self.find_black_heart()
                 if black_heart_y > 0:
                     self.device.shell(f'input tap 91 {black_heart_y + 10}')
+                    self.likes.set(self.likes.get() + 1)
                     self.device.shell(f'input touchscreen swipe 500 2000 500 1000')
                 else:
                     self.device.shell(f'input touchscreen swipe 500 2000 500 1500')
