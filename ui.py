@@ -1,29 +1,53 @@
-import time
-import tkinter
-
 from tkinter import *
-from datetime import date, datetime
 
+from RunMode import RunMode
+from UiState import UiState
 from WorkerThread import WorkerThread
 
 
 def start_clicked():
-    t = WorkerThread()
-    t.start()
-    print('start clicked')
+    global worker_thread, run_mode, rb_1, rb_2
+    if worker_thread is None or worker_thread.ui_state == UiState.stopped:
+        worker_thread = WorkerThread(run_mode)
+        worker_thread.start()
+        rb_1['state'] = DISABLED
+        rb_2['state'] = DISABLED
+    elif worker_thread.ui_state == UiState.paused:
+        worker_thread.ui_state = UiState.running
+        rb_1['state'] = DISABLED
+        rb_2['state'] = DISABLED
 
 
 def pause_clicked():
-    print('pause clicked')
+    global worker_thread
+    if worker_thread is None:
+        return
+    if worker_thread.ui_state == UiState.running:
+        worker_thread.ui_state = UiState.paused
+        print('paused')
 
 
 def stop_clicked():
-    print('stop clicked')
+    global worker_thread, rb_1, rb_2
+    if worker_thread is None:
+        return
+    if worker_thread.ui_state == UiState.paused or worker_thread.ui_state == UiState.running:
+        worker_thread.ui_state = UiState.stopped
+        rb_1['state'] = NORMAL
+        rb_2['state'] = NORMAL
+        print('stopped')
 
 
 def selected():
-    print(f'radio selected: {radio_selection.get()}')
+    global run_mode
+    if radio_selection.get() == 1:
+        run_mode = RunMode.continuous
+    elif radio_selection.get() == 2:
+        run_mode = RunMode.followers
 
+
+worker_thread: WorkerThread = None
+run_mode = RunMode.followers
 
 root = Tk()
 root.title('IG Awareness Helper')
