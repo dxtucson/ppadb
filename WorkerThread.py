@@ -194,6 +194,7 @@ class WorkerThread(threading.Thread):
                             black_heart_y = self.find_black_heart()
                             if black_heart_y > 0:
                                 self.device.shell(f'input tap 91 {black_heart_y + 10}')
+                                self.likes.set(self.likes.get() + 1)
                             if self.ui_state == UiState.stopped:
                                 break
                             self.sleep1()
