@@ -24,18 +24,15 @@ def pause_clicked():
         return
     if worker_thread.ui_state == UiState.running:
         worker_thread.ui_state = UiState.paused
-        print('paused')
 
 
 def stop_clicked():
     global worker_thread, rb_1, rb_2
     if worker_thread is None:
         return
-    if worker_thread.ui_state == UiState.paused or worker_thread.ui_state == UiState.running:
-        worker_thread.ui_state = UiState.stopped
-        rb_1['state'] = NORMAL
-        rb_2['state'] = NORMAL
-        print('stopped')
+    worker_thread.ui_state = UiState.stopped
+    rb_1['state'] = NORMAL
+    rb_2['state'] = NORMAL
 
 
 def selected():
@@ -46,12 +43,19 @@ def selected():
         run_mode = RunMode.followers
 
 
+def on_closing():
+    if worker_thread is not None:
+        worker_thread.ui_state = UiState.stopped
+    root.destroy()
+
+
 worker_thread: WorkerThread = None
 run_mode = RunMode.followers
 
 root = Tk()
 root.title('IG Awareness Helper')
 root.resizable(False, False)
+root.protocol("WM_DELETE_WINDOW", on_closing)
 c = Canvas(root, width=360, height=280, bg='#f2f2f2')
 c.pack()
 
