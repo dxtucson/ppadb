@@ -139,11 +139,11 @@ class WorkerThread(threading.Thread):
         else:
             time.sleep(2)
 
-    def sleep5(self):
+    def sleep3(self):
         if self.ui_state == UiState.paused:
             self.pause_for_a_sec()
         else:
-            time.sleep(5)
+            time.sleep(3)
 
     def pause_for_a_sec(self):
         while self.ui_state == UiState.paused:
@@ -186,7 +186,7 @@ class WorkerThread(threading.Thread):
                         if self.ui_state == UiState.stopped:
                             break
                         self.device.shell(f'input tap {self.half_width} {y}')  # tap on user
-                        self.sleep5()  # load user page
+                        self.sleep3()  # load user page
                         first_image_y = self.find_first_image_y()
                         if first_image_y > 0:  # found an image to like
                             self.device.shell(f'input tap 250 {first_image_y}')  # tap on image
