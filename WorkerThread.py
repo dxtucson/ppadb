@@ -1,11 +1,8 @@
 import threading
-import time
 from tkinter import IntVar
-
 from ppadb.client import Client
 from PIL import Image
 import numpy
-from numpy import save
 from numpy import load
 import time
 import os

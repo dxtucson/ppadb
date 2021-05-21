@@ -1,6 +1,6 @@
 from tkinter import *
-
 from RunMode import RunMode
+from ScreenshotThread import ScreenshotThread
 from UiState import UiState
 from WorkerThread import WorkerThread
 
@@ -36,6 +36,11 @@ def stop_clicked():
     rb_2['state'] = NORMAL
 
 
+def screenshot_clicked():
+    t = ScreenshotThread()
+    t.start()
+
+
 def selected():
     global run_mode
     if radio_selection.get() == 1:
@@ -57,7 +62,7 @@ root = Tk()
 root.title('IG Awareness Helper')
 root.resizable(False, False)
 root.protocol("WM_DELETE_WINDOW", on_closing)
-c = Canvas(root, width=360, height=280, bg='#f2f2f2')
+c = Canvas(root, width=360, height=320, bg='#f2f2f2')
 c.pack()
 
 radio_selection = IntVar()
@@ -86,5 +91,8 @@ pause_button.place(x=155, y=200, width=50, height=40)
 
 stop_button = Button(root, font='Arial 11', text='Stop', bd='2', command=stop_clicked)
 stop_button.place(x=230, y=200, width=50, height=40)
+
+screenshot_button = Button(root, font='Arial 11', text='Screenshot', bd='2', command=screenshot_clicked)
+screenshot_button.place(x=130, y=260, width=100, height=40)
 
 root.mainloop()
