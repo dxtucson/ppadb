@@ -43,8 +43,7 @@ class WorkerThread(threading.Thread):
 
     # find start Y of black heart. Return -1 if not found
     def find_black_heart(self) -> int:
-
-        image = numpy.asarray(Image.open("failed.png"))
+        image = self.screenshot()
         vertical_slice = image[:, 90:92]
         y_start = -1
         equal_count = 0
