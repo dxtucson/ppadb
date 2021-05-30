@@ -43,7 +43,8 @@ class WorkerThread(threading.Thread):
 
     # find start Y of black heart. Return -1 if not found
     def find_black_heart(self) -> int:
-        image = self.screenshot()
+
+        image = numpy.asarray(Image.open("failed.png"))
         vertical_slice = image[:, 90:92]
         y_start = -1
         equal_count = 0
@@ -82,7 +83,9 @@ class WorkerThread(threading.Thread):
                                     # print('bottom_check is not all white!')
                                     return -1
                             return y_start
-
+            else:
+                y_start = -1
+                equal_count = 0
         # print('Potential heart not found.')
         return -1
 
@@ -168,6 +171,7 @@ class WorkerThread(threading.Thread):
 
             if self.run_mode == RunMode.continuous:  # same with like_place
                 black_heart_y = self.find_black_heart()
+                print(f'y is: {black_heart_y}')
                 if black_heart_y > 0:
                     self.device.shell(f'input tap 91 {black_heart_y + 10}')
                     self.likes.set(self.likes.get() + 1)
@@ -192,7 +196,7 @@ class WorkerThread(threading.Thread):
                             self.device.shell(f'input tap 250 {first_image_y}')  # tap on image
                             self.sleep2()
                             black_heart_y = self.find_black_heart()
-                            if black_heart_y > 1300: # in case the user's icon has heart
+                            if black_heart_y > 1300:  # in case the user's icon has heart
                                 self.device.shell(f'input tap 91 {black_heart_y + 10}')
                                 self.likes.set(self.likes.get() + 1)
                             if self.ui_state == UiState.stopped:
