@@ -139,8 +139,8 @@ class WorkerThread(threading.Thread):
         while self.ui_state == UiState.paused:
             time.sleep(1)
 
-    def scroll_a_page(self):
-        self.device.shell(f'input touchscreen swipe 500 {self.feed_bottom} 500 {self.follow_top} 2000')
+    def scroll_a_page(self, start=feed_bottom, end=follow_top):
+        self.device.shell(f'input touchscreen swipe 500 {start} 500 {end} 2000')
 
     def screenshot(self):
         image = self.device.screencap()
@@ -158,7 +158,6 @@ class WorkerThread(threading.Thread):
 
             if self.run_mode == RunMode.continuous:  # same with like_place
                 black_heart_y = self.find_black_heart()
-                print(f'y is: {black_heart_y}')
                 if black_heart_y > 0:
                     self.device.shell(f'input tap 91 {black_heart_y + 10}')
                     self.likes.set(self.likes.get() + 1)
@@ -182,7 +181,6 @@ class WorkerThread(threading.Thread):
                         first_image_y = self.find_first_image_y()
                         if first_image_y < 0:
                             self.sleep1()
-                            print('user page loaded in more than 1 sec')
                             first_image_y = self.find_first_image_y()
                         if first_image_y > 0:  # found an image to like
                             self.device.shell(f'input tap 250 {first_image_y}')  # tap on image
@@ -199,5 +197,10 @@ class WorkerThread(threading.Thread):
                         else:  # private user or no image
                             self.tap_on_back()
                         self.sleep1()
-                    self.scroll_a_page()
+                    if len(follow_buttons_y) > 1:
+                        dist = follow_buttons_y[1] - follow_buttons_y[0]
+                        self.scroll_a_page(start=follow_buttons_y[-1], end=follow_buttons_y[0] - dist)
+                    else:
+                        self.scroll_a_page()
+
             self.sleep1()
