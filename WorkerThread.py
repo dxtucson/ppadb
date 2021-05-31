@@ -6,7 +6,7 @@ import numpy
 from numpy import load
 import time
 import os
-
+import pytesseract
 from RunMode import RunMode
 from UiState import UiState
 
@@ -28,11 +28,16 @@ class WorkerThread(threading.Thread):
     half_width = 720  # half of the screen width
     follow_button_x = 1050  # this point should have blue(0, 149, 246, 255) if it is follow button
     left_thin_margin = 5  # help to decide whether there is a tab indicator (thin black horizontal line)
+    name_start_x = 300  # to get names of followers (or likers)
+    name_end_x = 990
+    name_top_to_follow_button = 65
+    name_bottom_to_follow_button = 170
 
     os.system('cmd /c "C:\\Users\\David\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb devices"')
     adb = Client(host='127.0.0.1', port=5037)
     devices = adb.devices()
-
+    pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
+    # print(pytesseract.image_to_string(Image.open('2021-05-20 21-40-19.467606.png')))
     if len(devices) == 0:
         print('no device attached')
         quit()
@@ -88,16 +93,28 @@ class WorkerThread(threading.Thread):
         # print('Potential heart not found.')
         return -1
 
+    def have_not_liked(self, user_name):
+        return True
+
     def find_follow_button_y_array(self):
         image = self.screenshot()
         vertical_slice = image[self.follow_top:self.feed_bottom, self.follow_button_x]
-        follow_buttons_y = []
+        follow_buttons_y = {}
         # the input will have one column of pixels
         same_button = False
         for row in range(numpy.shape(vertical_slice)[0]):
             if (vertical_slice[row] == [0, 149, 246, 255]).all():
                 if not same_button:
-                    follow_buttons_y.append(row + self.follow_top)
+                    current_y_follow = row + self.follow_top
+                    name_image = image[
+                                 current_y_follow - self.name_top_to_follow_button: current_y_follow + self.name_bottom_to_follow_button,
+                                 self.name_start_x: self.name_end_x]
+                    ocr_result = pytesseract.image_to_string(Image.fromarray(name_image),
+                                                             config='tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyz').split(
+                        "\n")[0]
+                    print(f'name of follower: {ocr_result}')
+                    if self.have_not_liked(ocr_result):
+                        follow_buttons_y[current_y_follow] = ocr_result
                     same_button = True
             if (vertical_slice[row] == [255, 255, 255, 255]).all():
                 if same_button:
@@ -173,7 +190,7 @@ class WorkerThread(threading.Thread):
                     self.scroll_a_page()
                 else:
                     # click on the users found in this page
-                    for y in follow_buttons_y:
+                    for y in follow_buttons_y.keys():
                         if self.ui_state == UiState.stopped:
                             break
                         self.device.shell(f'input tap {self.half_width} {y}')  # tap on user
@@ -198,8 +215,9 @@ class WorkerThread(threading.Thread):
                             self.tap_on_back()
                         self.sleep1()
                     if len(follow_buttons_y) > 1:
-                        dist = follow_buttons_y[1] - follow_buttons_y[0]
-                        self.scroll_a_page(start=follow_buttons_y[-1], end=follow_buttons_y[0] - dist)
+                        y_list = list(follow_buttons_y.keys())
+                        dist = y_list[1] - y_list[0]
+                        self.scroll_a_page(start=y_list[-1], end=y_list[0] - dist)
                     else:
                         self.scroll_a_page()
 
