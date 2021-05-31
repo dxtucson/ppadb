@@ -135,18 +135,6 @@ class WorkerThread(threading.Thread):
         else:
             time.sleep(1)
 
-    def sleep2(self):
-        if self.ui_state == UiState.paused:
-            self.pause_for_a_sec()
-        else:
-            time.sleep(2)
-
-    def sleep3(self):
-        if self.ui_state == UiState.paused:
-            self.pause_for_a_sec()
-        else:
-            time.sleep(3)
-
     def pause_for_a_sec(self):
         while self.ui_state == UiState.paused:
             time.sleep(1)
@@ -174,9 +162,10 @@ class WorkerThread(threading.Thread):
                 if black_heart_y > 0:
                     self.device.shell(f'input tap 91 {black_heart_y + 10}')
                     self.likes.set(self.likes.get() + 1)
-                    self.device.shell(f'input touchscreen swipe 500 2000 500 1000')
+                    self.device.shell(f'input touchscreen swipe 500 {black_heart_y} 500 100 1000')
                 else:
-                    self.device.shell(f'input touchscreen swipe 500 2000 500 1500')
+                    # scroll to half and look for heart again
+                    self.device.shell(f'input touchscreen swipe 500 2536 500 1200 1000')
             elif self.run_mode == RunMode.followers:
                 # find follow buttons
                 follow_buttons_y = self.find_follow_button_y_array()
@@ -189,11 +178,15 @@ class WorkerThread(threading.Thread):
                         if self.ui_state == UiState.stopped:
                             break
                         self.device.shell(f'input tap {self.half_width} {y}')  # tap on user
-                        self.sleep2()  # load user page
+                        self.sleep1()
                         first_image_y = self.find_first_image_y()
+                        if first_image_y < 0:
+                            self.sleep1()
+                            print('user page loaded in more than 1 sec')
+                            first_image_y = self.find_first_image_y()
                         if first_image_y > 0:  # found an image to like
                             self.device.shell(f'input tap 250 {first_image_y}')  # tap on image
-                            self.sleep2()
+                            self.sleep1()
                             black_heart_y = self.find_black_heart()
                             if black_heart_y > 1300:  # in case the user's icon has heart
                                 self.device.shell(f'input tap 91 {black_heart_y + 10}')
