@@ -37,7 +37,6 @@ class WorkerThread(threading.Thread):
     adb = Client(host='127.0.0.1', port=5037)
     devices = adb.devices()
     pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
-    # print(pytesseract.image_to_string(Image.open('2021-05-20 21-40-19.467606.png')))
     if len(devices) == 0:
         print('no device attached')
         quit()
@@ -94,7 +93,16 @@ class WorkerThread(threading.Thread):
         return -1
 
     def have_not_liked(self, user_name):
+        # look up db see if user has been visited
         return True
+
+    def save_visited(self, user_name: str, success: bool):
+        if success:
+            print(f'visit user {user_name} done')
+        else:
+            print(f'visit user {user_name} NOT done')
+        # save visited in db
+        return
 
     def find_follow_button_y_array(self):
         image = self.screenshot()
@@ -205,13 +213,17 @@ class WorkerThread(threading.Thread):
                             black_heart_y = self.find_black_heart()
                             if black_heart_y > 1300:  # in case the user's icon has heart
                                 self.device.shell(f'input tap 91 {black_heart_y + 10}')
+                                self.save_visited(user_name=follow_buttons_y[y], success=True)
                                 self.likes.set(self.likes.get() + 1)
+                            else:
+                                self.save_visited(user_name=follow_buttons_y[y], success=True)
                             if self.ui_state == UiState.stopped:
                                 break
                             self.tap_on_back()  # to user view
                             self.sleep1()
                             self.tap_on_back()  # to follower view
                         else:  # private user or no image
+                            self.save_visited(user_name=follow_buttons_y[y], success=False)
                             self.tap_on_back()
                         self.sleep1()
                     if len(follow_buttons_y) > 1:
