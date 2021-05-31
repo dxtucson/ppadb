@@ -96,3 +96,5 @@ screenshot_button = Button(root, font='Arial 11', text='Screenshot', bd='2', com
 screenshot_button.place(x=130, y=260, width=100, height=40)
 
 root.mainloop()
+
+# to build: pyinstaller -w -F -i "heart.ico" IGLikeHelper.py

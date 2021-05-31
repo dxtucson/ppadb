@@ -9,6 +9,8 @@ import os
 import pytesseract
 from RunMode import RunMode
 from UiState import UiState
+import sqlite3
+import datetime
 
 
 class WorkerThread(threading.Thread):
@@ -32,11 +34,19 @@ class WorkerThread(threading.Thread):
     name_end_x = 990
     name_top_to_follow_button = 65
     name_bottom_to_follow_button = 170
+    days_before_revisit = 30
 
     os.system('cmd /c "C:\\Users\\David\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb devices"')
     adb = Client(host='127.0.0.1', port=5037)
     devices = adb.devices()
     pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
+
+    connection = sqlite3.connect('likes.db', check_same_thread=False)
+    cursor = connection.cursor()
+    cursor.execute(
+        """CREATE TABLE IF NOT EXISTS likes(user_id TEXT NOT NULL PRIMARY KEY, last_visit TEXT NOT NULL, 
+        is_private INTEGER DEFAULT 0)""")
+
     if len(devices) == 0:
         print('no device attached')
         quit()
@@ -92,16 +102,38 @@ class WorkerThread(threading.Thread):
         # print('Potential heart not found.')
         return -1
 
-    def have_not_liked(self, user_name):
+    def never_visited(self, u_name):
         # look up db see if user has been visited
-        return True
-
-    def save_visited(self, user_name: str, success: bool):
-        if success:
-            print(f'visit user {user_name} done')
+        result = self.connection.execute('''SELECT * FROM likes WHERE user_id=?''', (u_name,)).fetchone()
+        if result:
+            if result[2]:
+                # the user is known to be private
+                return False
+            time_since_last_visit = datetime.datetime.now() - datetime.datetime.strptime(result[1],
+                                                                                         '%Y-%m-%d %H:%M:%S.%f')
+            if time_since_last_visit.days > self.days_before_revisit:
+                return True
+            else:
+                return False
         else:
-            print(f'visit user {user_name} NOT done')
-        # save visited in db
+            return True
+
+    def save_visited(self, user_id: str, success: bool):
+        sql = "INSERT OR REPLACE INTO likes (user_id, last_visit, is_private) VALUES (?, ?, ?)"
+        timestamp = str(datetime.datetime.now())
+        if success:
+            self.connection.execute(sql, (user_id, timestamp, False))
+            self.connection.commit()
+            print(f'visit user {user_id} done')
+        else:
+            # check if the account is private
+            ocr_result = pytesseract.image_to_string(Image.open('screen.png'),
+                                                     config='tessedit_char_whitelist=0123456789abcdefghijklmnopPqrstuvwxyz')
+            if "Private" in ocr_result:
+                self.connection.execute(sql, (user_id, timestamp, True))
+                self.connection.commit()
+                print(f'visit user {user_id} not done: Private User')
+            # else: the visit was not successful due to slow connection
         return
 
     def find_follow_button_y_array(self):
@@ -120,8 +152,8 @@ class WorkerThread(threading.Thread):
                     ocr_result = pytesseract.image_to_string(Image.fromarray(name_image),
                                                              config='tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyz').split(
                         "\n")[0]
-                    print(f'name of follower: {ocr_result}')
-                    if self.have_not_liked(ocr_result):
+                    # print(f'name of follower: {ocr_result}')
+                    if self.never_visited(ocr_result):
                         follow_buttons_y[current_y_follow] = ocr_result
                     same_button = True
             if (vertical_slice[row] == [255, 255, 255, 255]).all():
@@ -213,17 +245,17 @@ class WorkerThread(threading.Thread):
                             black_heart_y = self.find_black_heart()
                             if black_heart_y > 1300:  # in case the user's icon has heart
                                 self.device.shell(f'input tap 91 {black_heart_y + 10}')
-                                self.save_visited(user_name=follow_buttons_y[y], success=True)
+                                self.save_visited(user_id=follow_buttons_y[y], success=True)
                                 self.likes.set(self.likes.get() + 1)
                             else:
-                                self.save_visited(user_name=follow_buttons_y[y], success=True)
+                                self.save_visited(user_id=follow_buttons_y[y], success=True)
                             if self.ui_state == UiState.stopped:
                                 break
                             self.tap_on_back()  # to user view
                             self.sleep1()
                             self.tap_on_back()  # to follower view
                         else:  # private user or no image
-                            self.save_visited(user_name=follow_buttons_y[y], success=False)
+                            self.save_visited(user_id=follow_buttons_y[y], success=False)
                             self.tap_on_back()
                         self.sleep1()
                     if len(follow_buttons_y) > 1:
