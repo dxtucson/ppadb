@@ -270,5 +270,3 @@ class WorkerThread(threading.Thread):
                             self.tap_on_back()
                     self.scroll_a_page(start=self.bottom_button_Y, end=266)
                     self.bottom_button_Y = 0
-
-            self.sleep1()
