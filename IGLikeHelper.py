@@ -6,17 +6,19 @@ from WorkerThread import WorkerThread
 
 
 def start_clicked():
-    global worker_thread, run_mode, rb_1, rb_2, counter_var
+    global worker_thread, run_mode, rb_1, rb_2, rb_3, counter_var
 
     if worker_thread is None or worker_thread.ui_state == UiState.stopped:
         worker_thread = WorkerThread(run_mode, counter_var)
         worker_thread.start()
         rb_1['state'] = DISABLED
         rb_2['state'] = DISABLED
+        rb_3['state'] = DISABLED
     elif worker_thread.ui_state == UiState.paused:
         worker_thread.ui_state = UiState.running
         rb_1['state'] = DISABLED
         rb_2['state'] = DISABLED
+        rb_3['state'] = DISABLED
 
 
 def pause_clicked():
@@ -28,12 +30,13 @@ def pause_clicked():
 
 
 def stop_clicked():
-    global worker_thread, rb_1, rb_2
+    global worker_thread, rb_1, rb_2, rb_3
     if worker_thread is None:
         return
     worker_thread.ui_state = UiState.stopped
     rb_1['state'] = NORMAL
     rb_2['state'] = NORMAL
+    rb_3['state'] = NORMAL
 
 
 def screenshot_clicked():
@@ -47,6 +50,8 @@ def selected():
         run_mode = RunMode.continuous
     elif radio_selection.get() == 2:
         run_mode = RunMode.followers
+    elif radio_selection.get() == 3:
+        run_mode = RunMode.posts
 
 
 def on_closing():
@@ -73,15 +78,19 @@ counter_var.set(0)
 
 rb_1 = Radiobutton(root, font='Arial 11', width='12', text="Continuous", padx=20, value=1, variable=radio_selection,
                    command=selected)
-rb_1.place(x=132, y=30, width=100, height=30)
+rb_1.place(x=132, y=20, width=100, height=30)
 
 rb_2 = Radiobutton(root, font='Arial 11', width='12', text="Followers ", padx=20, value=2, variable=radio_selection,
                    command=selected)
-rb_2.place(x=129, y=60, width=100, height=30)
+rb_2.place(x=129, y=50, width=100, height=30)
 
-c.create_text(180, 120, font='Arial 13', text='Posts you\'ve liked:')
+rb_3 = Radiobutton(root, font='Arial 11', width='12', text="Likes on post", padx=20, value=3, variable=radio_selection,
+                   command=selected)
+rb_3.place(x=128, y=80, width=120, height=30)
+
+c.create_text(180, 130, font='Arial 13', text='Posts you\'ve liked:')
 counter_label = Label(root, font='Arial 20', textvariable=counter_var)
-counter_label.place(x=180, y=160, anchor='center')
+counter_label.place(x=180, y=170, anchor='center')
 
 start_button = Button(root, font='Arial 11', text='Start', bd='2', command=start_clicked)
 start_button.place(x=80, y=200, width=50, height=40)
