@@ -136,6 +136,9 @@ class WorkerThread(threading.Thread):
             # else: the visit was not successful due to slow connection
         return
 
+    top_button_Y = 0
+    bottom_button_Y = 0
+
     def find_follow_button_y_array(self):
         image = self.screenshot()
         vertical_slice = image[self.follow_top:self.feed_bottom, self.follow_button_x]
@@ -159,6 +162,10 @@ class WorkerThread(threading.Thread):
             if (vertical_slice[row] == [255, 255, 255, 255]).all():
                 if same_button:
                     same_button = False
+            else:
+                if self.top_button_Y == 0:
+                    self.top_button_Y = row + self.follow_top
+                self.bottom_button_Y = max(row + self.follow_top, self.bottom_button_Y)
         return follow_buttons_y
 
     def find_first_image_y(self):
@@ -258,11 +265,9 @@ class WorkerThread(threading.Thread):
                             self.save_visited(user_id=follow_buttons_y[y], success=False)
                             self.tap_on_back()
                         self.sleep1()
-                    if len(follow_buttons_y) > 1:
-                        y_list = list(follow_buttons_y.keys())
-                        dist = y_list[1] - y_list[0]
-                        self.scroll_a_page(start=y_list[-1], end=y_list[0] - dist)
-                    else:
-                        self.scroll_a_page()
+                    self.scroll_a_page(start=self.bottom_button_Y,
+                                       end=self.top_button_Y - self.name_bottom_to_follow_button)
+                    self.bottom_button_Y = 0
+                    self.top_button_Y = 0
 
             self.sleep1()
