@@ -261,7 +261,7 @@ class WorkerThread(threading.Thread):
                 first_image_y = self.find_first_image_y()
                 if first_image_y > 0:  # found an image to like
                     self.device.shell(f'input tap 250 {first_image_y}')  # tap on image
-                    self.sleep_half()
+                    self.sleep1()
                     black_heart_y = self.find_black_heart()
                     if black_heart_y > 1300:  # in case the user's icon has heart
                         self.device.shell(f'input tap 91 {black_heart_y + 10}')
@@ -274,6 +274,7 @@ class WorkerThread(threading.Thread):
                     self.tap_on_back()  # to user view
                     self.sleep_half()
                     self.tap_on_back()  # to follower view
+                    self.sleep_half()
                 else:  # private user or no image
                     self.save_visited(user_id=y_map[y], success=False)
                     self.tap_on_back()
@@ -315,3 +316,4 @@ class WorkerThread(threading.Thread):
                 # find follow buttons
                 followers_y = self.find_follow_button_y_array()
                 self.click_on_user_and_like(followers_y)
+            self.sleep1()
