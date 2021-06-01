@@ -146,26 +146,33 @@ class WorkerThread(threading.Thread):
         # the input will have one column of pixels
         same_button = False
         for row in range(numpy.shape(vertical_slice)[0]):
-            if (vertical_slice[row] == [0, 149, 246, 255]).all():
-                if not same_button:
-                    current_y_follow = row + self.follow_top
-                    name_image = image[
-                                 current_y_follow - self.name_top_to_follow_button: current_y_follow + self.name_bottom_to_follow_button,
-                                 self.name_start_x: self.name_end_x]
-                    ocr_result = pytesseract.image_to_string(Image.fromarray(name_image),
-                                                             config='tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyz').split(
-                        "\n")[0]
-                    # print(f'name of follower: {ocr_result}')
-                    if self.never_visited(ocr_result):
-                        follow_buttons_y[current_y_follow] = ocr_result
-                    same_button = True
             if (vertical_slice[row] == [255, 255, 255, 255]).all():
-                if same_button:
-                    same_button = False
+                same_button = False
             else:
-                if self.top_button_Y == 0:
-                    self.top_button_Y = row + self.follow_top
-                self.bottom_button_Y = max(row + self.follow_top, self.bottom_button_Y)
+                # follow or unfollow button
+                # blue button
+                if (vertical_slice[row] == [0, 149, 246, 255]).all():  # this is follow button
+                    if not same_button:
+                        current_y_follow = row + self.follow_top
+                        name_image = image[
+                                     current_y_follow - self.name_top_to_follow_button: current_y_follow + self.name_bottom_to_follow_button,
+                                     self.name_start_x: self.name_end_x]
+                        ocr_result = pytesseract.image_to_string(Image.fromarray(name_image),
+                                                                 config='tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyz').split(
+                            "\n")[0]
+                        # print(f'name of follower: {ocr_result}')
+                        if self.never_visited(ocr_result):
+                            follow_buttons_y[current_y_follow] = ocr_result
+                        if self.top_button_Y == 0:
+                            self.top_button_Y = current_y_follow
+                        self.bottom_button_Y = max(self.bottom_button_Y, row + self.follow_top)
+                        same_button = True
+                else:
+                    if not same_button:
+                        if self.top_button_Y == 0:
+                            self.top_button_Y = row + self.follow_top
+                        self.bottom_button_Y = max(self.bottom_button_Y, row + self.follow_top)
+                        same_button = True
         return follow_buttons_y
 
     def find_first_image_y(self):
@@ -199,12 +206,18 @@ class WorkerThread(threading.Thread):
         else:
             time.sleep(1)
 
+    def sleep_half(self):
+        if self.ui_state == UiState.paused:
+            self.pause_for_a_sec()
+        else:
+            time.sleep(0.5)
+
     def pause_for_a_sec(self):
         while self.ui_state == UiState.paused:
             time.sleep(1)
 
     def scroll_a_page(self, start=feed_bottom, end=follow_top):
-        self.device.shell(f'input touchscreen swipe 500 {start} 500 {end} 2000')
+        self.device.shell(f'input touchscreen swipe 500 {start} 500 {end} 3000')
 
     def screenshot(self):
         image = self.device.screencap()
@@ -219,7 +232,6 @@ class WorkerThread(threading.Thread):
     def run(self, *args, **kwargs):
 
         while self.ui_state == UiState.running or self.ui_state == UiState.paused:
-
             if self.run_mode == RunMode.continuous:  # same with like_place
                 black_heart_y = self.find_black_heart()
                 if black_heart_y > 0:
@@ -243,12 +255,9 @@ class WorkerThread(threading.Thread):
                         self.device.shell(f'input tap {self.half_width} {y}')  # tap on user
                         self.sleep1()
                         first_image_y = self.find_first_image_y()
-                        if first_image_y < 0:
-                            self.sleep1()
-                            first_image_y = self.find_first_image_y()
                         if first_image_y > 0:  # found an image to like
                             self.device.shell(f'input tap 250 {first_image_y}')  # tap on image
-                            self.sleep1()
+                            self.sleep_half()
                             black_heart_y = self.find_black_heart()
                             if black_heart_y > 1300:  # in case the user's icon has heart
                                 self.device.shell(f'input tap 91 {black_heart_y + 10}')
@@ -259,14 +268,12 @@ class WorkerThread(threading.Thread):
                             if self.ui_state == UiState.stopped:
                                 break
                             self.tap_on_back()  # to user view
-                            self.sleep1()
+                            self.sleep_half()
                             self.tap_on_back()  # to follower view
                         else:  # private user or no image
                             self.save_visited(user_id=follow_buttons_y[y], success=False)
                             self.tap_on_back()
-                        self.sleep1()
-                    self.scroll_a_page(start=self.bottom_button_Y,
-                                       end=self.top_button_Y - self.name_bottom_to_follow_button)
+                    self.scroll_a_page(start=self.bottom_button_Y, end=572)
                     self.bottom_button_Y = 0
                     self.top_button_Y = 0
 
