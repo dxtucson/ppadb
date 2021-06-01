@@ -143,31 +143,33 @@ class WorkerThread(threading.Thread):
         vertical_slice = image[self.follow_top:self.feed_bottom, self.follow_button_x]
         follow_buttons_y = {}
         # the input will have one column of pixels
-        same_button = False
+        follow_found = False
+        unfollow_found = 0
         for row in range(numpy.shape(vertical_slice)[0]):
             if (vertical_slice[row] == [255, 255, 255, 255]).all():
-                same_button = False
-            else:
-                # follow or unfollow button
-                # blue button
-                if (vertical_slice[row] == [0, 149, 246, 255]).all():  # this is follow button
-                    if not same_button:
-                        current_y_follow = row + self.follow_top
-                        name_image = image[
-                                     current_y_follow - self.name_top_to_follow_button: current_y_follow + self.name_bottom_to_follow_button,
-                                     self.name_start_x: self.name_end_x]
-                        ocr_result = pytesseract.image_to_string(Image.fromarray(name_image),
-                                                                 config='tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyz').split(
-                            "\n")[0]
-                        # print(f'name of follower: {ocr_result}')
-                        if self.never_visited(ocr_result):
-                            follow_buttons_y[current_y_follow] = ocr_result
-                        self.bottom_button_Y = max(self.bottom_button_Y, row + self.follow_top)
-                        same_button = True
-                else:
-                    if not same_button:
-                        self.bottom_button_Y = max(self.bottom_button_Y, row + self.follow_top)
-                        same_button = True
+                follow_found = False
+            elif (vertical_slice[row] == [219, 219, 219, 255]).all():
+                if unfollow_found == 0:
+                    # update last button Y
+                    self.bottom_button_Y = max(self.bottom_button_Y, row + self.follow_top)
+                unfollow_found += 1
+                if unfollow_found == 8:
+                    unfollow_found = 0
+            elif (vertical_slice[row] == [0, 149, 246, 255]).all():
+                if not follow_found:
+                    # update follow and user name map
+                    current_y_follow = row + self.follow_top
+                    self.bottom_button_Y = max(self.bottom_button_Y, current_y_follow)
+                    name_image = image[
+                                 current_y_follow - self.name_top_to_follow_button: current_y_follow + self.name_bottom_to_follow_button,
+                                 self.name_start_x: self.name_end_x]
+                    ocr_result = pytesseract.image_to_string(Image.fromarray(name_image),
+                                                             config='tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyz').split(
+                        "\n")[0]
+                    # print(f'name of follower: {ocr_result}')
+                    if self.never_visited(ocr_result):
+                        follow_buttons_y[current_y_follow] = ocr_result
+                follow_found = True
         return follow_buttons_y
 
     def find_first_image_y(self):
