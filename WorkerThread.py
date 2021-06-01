@@ -136,7 +136,6 @@ class WorkerThread(threading.Thread):
             # else: the visit was not successful due to slow connection
         return
 
-    top_button_Y = 0
     bottom_button_Y = 0
 
     def find_follow_button_y_array(self):
@@ -163,14 +162,10 @@ class WorkerThread(threading.Thread):
                         # print(f'name of follower: {ocr_result}')
                         if self.never_visited(ocr_result):
                             follow_buttons_y[current_y_follow] = ocr_result
-                        if self.top_button_Y == 0:
-                            self.top_button_Y = current_y_follow
                         self.bottom_button_Y = max(self.bottom_button_Y, row + self.follow_top)
                         same_button = True
                 else:
                     if not same_button:
-                        if self.top_button_Y == 0:
-                            self.top_button_Y = row + self.follow_top
                         self.bottom_button_Y = max(self.bottom_button_Y, row + self.follow_top)
                         same_button = True
         return follow_buttons_y
@@ -273,8 +268,7 @@ class WorkerThread(threading.Thread):
                         else:  # private user or no image
                             self.save_visited(user_id=follow_buttons_y[y], success=False)
                             self.tap_on_back()
-                    self.scroll_a_page(start=self.bottom_button_Y, end=572)
+                    self.scroll_a_page(start=self.bottom_button_Y, end=266)
                     self.bottom_button_Y = 0
-                    self.top_button_Y = 0
 
             self.sleep1()
