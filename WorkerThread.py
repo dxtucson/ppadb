@@ -116,7 +116,16 @@ class WorkerThread(threading.Thread):
                     y_start = ay
                 equal_count += 1
                 if equal_count == 2:
-                    return y_start
+                    # check the text is below contains "Liked" or " likes"
+                    no_likes_image = image[y_start + 110: y_start + 170, 40: 1300]
+                    ocr_result = pytesseract.image_to_string(Image.fromarray(no_likes_image),
+                                                             config='tessedit_char_whitelist=0123456789abcdefghijkLlmnopqrstuvwxyz')
+                    # print(f'ocr_result: {ocr_result}')
+                    if ocr_result.startswith('Liked'):
+                        return y_start
+                    if ocr_result.find('likes') != -1:
+                        return y_start
+                    return -1
             else:
                 y_start = -1
                 equal_count = 0
