@@ -259,6 +259,33 @@ class WorkerThread(threading.Thread):
         image = numpy.array(image, dtype=numpy.uint8)
         return image
 
+    def visit_users_and_like(self, y_map):
+        for y in y_map.keys():
+            if self.ui_state == UiState.stopped:
+                break
+            self.device.shell(f'input tap {self.half_width} {y}')  # tap on user
+            self.sleep1()
+            first_image_y = self.find_first_image_y()
+            if first_image_y > 0:  # found an image to like
+                self.device.shell(f'input tap 250 {first_image_y}')  # tap on image
+                self.sleep1()
+                black_heart_y = self.find_black_heart()
+                if black_heart_y > 1300:  # in case the user's icon has heart
+                    self.device.shell(f'input tap 91 {black_heart_y + 10}')
+                    self.save_visited(user_id=y_map[y], success=True)
+                    self.likes.set(self.likes.get() + 1)
+                else:
+                    self.save_visited(user_id=y_map[y], success=True)
+                if self.ui_state == UiState.stopped:
+                    break
+                self.tap_on_back()  # to user view
+                self.sleep_half()
+                self.tap_on_back()  # to follower view
+                self.sleep_half()
+            else:  # private user or no image
+                self.save_visited(user_id=y_map[y], success=False)
+                self.tap_on_back()
+
     def click_on_user_and_like(self, y_map, scroll_up_stop=266):
         if not y_map:
             # scroll a entire page
@@ -302,11 +329,11 @@ class WorkerThread(threading.Thread):
                     self.device.shell(f'input tap 91 {black_or_red_heart_y + 150}')
                     # now in likes page
                     self.sleep_half()
+                    cur_map = self.find_follow_button_y_array(view_top=self.feed_top)
+                    while not cur_map:
+                        self.scroll_a_page(start=self.bottom_button_Y, end=self.feed_top)
+                        cur_map = self.find_follow_button_y_array(view_top=self.feed_top)
                     prev_map = {}
-                    cur_map = self.find_follow_button_y_array(view_top=self.feed_top)
-                    if not cur_map:
-                        self.scroll_a_page()
-                    cur_map = self.find_follow_button_y_array(view_top=self.feed_top)
                     while prev_map != cur_map and self.ui_state == UiState.running:
                         self.click_on_user_and_like(cur_map, 85)
                         prev_map = cur_map
@@ -327,5 +354,10 @@ class WorkerThread(threading.Thread):
             elif self.run_mode == RunMode.followers:
                 # find follow buttons
                 followers_y = self.find_follow_button_y_array()
-                self.click_on_user_and_like(followers_y)
+                while not followers_y:
+                    self.scroll_a_page(start=self.bottom_button_Y,
+                                       end=self.follow_top - self.name_bottom_to_follow_button)
+                    followers_y = self.find_follow_button_y_array()
+                self.visit_users_and_like(followers_y)
+                self.scroll_a_page(start=self.bottom_button_Y, end=self.follow_top - self.name_bottom_to_follow_button)
             self.sleep1()
