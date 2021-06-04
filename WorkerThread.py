@@ -245,7 +245,7 @@ class WorkerThread(threading.Thread):
             time.sleep(1)
 
     def scroll_a_page(self, start=feed_bottom, end=follow_top):
-        self.device.shell(f'input touchscreen swipe 500 {start} 500 {end} 3000')
+        self.device.shell(f'input touchscreen swipe 500 {start} 500 {end} 2000')
         self.bottom_button_Y = 0
 
     def screenshot(self):
@@ -295,10 +295,12 @@ class WorkerThread(threading.Thread):
                     # now in likes page
                     self.sleep_half()
                     cur_map = self.find_follow_button_y_array(view_top=self.feed_top)
-                    while not cur_map:
+                    attempt = 0
+                    while not cur_map and attempt < 3 and self.ui_state == UiState.running:
                         self.scroll_a_page(start=self.bottom_button_Y,
                                            end=self.feed_top - self.name_bottom_to_follow_button)
                         cur_map = self.find_follow_button_y_array(view_top=self.feed_top)
+                        attempt += 1
                     prev_map = {}
                     while cur_map and prev_map != cur_map and self.ui_state == UiState.running:
                         self.visit_users_and_like(cur_map)
