@@ -154,16 +154,19 @@ class WorkerThread(threading.Thread):
         if success:
             self.connection.execute(sql, (user_id, timestamp, False))
             self.connection.commit()
-            print(f'visit user {user_id} done')
+            # print(f'visit user {user_id} done')
         else:
             # check if the account is private
             ocr_result = pytesseract.image_to_string(Image.open('screen.png'),
                                                      config='tessedit_char_whitelist=0123456789abcdefghijklmnopPqrstuvwxyz')
             if "Private" in ocr_result:
                 self.connection.execute(sql, (user_id, timestamp, True))
-                self.connection.commit()
-                print(f'visit user {user_id} not done: Private User')
-            # else: the visit was not successful due to slow connection
+                # print(f'visit user {user_id} not done: Private User')
+            else:
+                # the visit was not successful due to slow connection
+                # could also be the user has zero image, consider visited for a number of days is fine
+                self.connection.execute(sql, (user_id, timestamp, False))
+            self.connection.commit()
         return
 
     bottom_button_Y = 0
