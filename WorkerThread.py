@@ -168,7 +168,7 @@ class WorkerThread(threading.Thread):
         return
 
     bottom_button_Y = 0
-
+    last_ocr_result = ''
     def find_follow_button_y_array(self, view_top=follow_top):
         image = self.screenshot()
         vertical_slice = image[view_top:self.feed_bottom, self.follow_button_x]
@@ -183,6 +183,15 @@ class WorkerThread(threading.Thread):
                 if unfollow_found == 0:
                     # update last button Y
                     self.bottom_button_Y = max(self.bottom_button_Y, row + view_top)
+                    current_y_follow = row + view_top
+                    self.bottom_button_Y = max(self.bottom_button_Y, current_y_follow)
+                    name_image = image[
+                                 current_y_follow - self.name_top_to_follow_button: current_y_follow + self.name_bottom_to_follow_button,
+                                 self.name_start_x: self.name_end_x]
+                    ocr_result = pytesseract.image_to_string(Image.fromarray(name_image),
+                                                             config='tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyz').split(
+                        "\n")[0]
+                    self.last_ocr_result = ocr_result
                 unfollow_found += 1
                 if unfollow_found == 8:
                     unfollow_found = 0
@@ -197,6 +206,7 @@ class WorkerThread(threading.Thread):
                     ocr_result = pytesseract.image_to_string(Image.fromarray(name_image),
                                                              config='tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyz').split(
                         "\n")[0]
+                    self.last_ocr_result = ocr_result
                     # print(f'name of follower: {ocr_result}')
                     if self.never_visited(ocr_result):
                         follow_buttons_y[current_y_follow] = ocr_result
@@ -295,18 +305,19 @@ class WorkerThread(threading.Thread):
                     # now in likes page
                     self.sleep_half()
                     cur_map = self.find_follow_button_y_array(view_top=self.feed_top)
-                    attempt = 0
-                    while not cur_map and attempt < 3 and self.ui_state == UiState.running:
+                    last_ocr_copy = ''
+                    while not cur_map and last_ocr_copy != self.last_ocr_result and self.ui_state == UiState.running:
                         self.scroll_a_page(start=self.bottom_button_Y,
                                            end=self.feed_top - self.name_bottom_to_follow_button)
+                        last_ocr_copy = str(self.last_ocr_result)
                         cur_map = self.find_follow_button_y_array(view_top=self.feed_top)
-                        attempt += 1
-                    prev_map = {}
-                    while cur_map and prev_map != cur_map and self.ui_state == UiState.running:
+
+                    last_ocr_copy = ''
+                    while last_ocr_copy != self.last_ocr_result and self.ui_state == UiState.running:
                         self.visit_users_and_like(cur_map)
-                        prev_map = cur_map
                         self.scroll_a_page(start=self.bottom_button_Y,
                                            end=self.feed_top - self.name_bottom_to_follow_button)
+                        last_ocr_copy = self.last_ocr_result
                         cur_map = self.find_follow_button_y_array(view_top=self.feed_top)
                     self.tap_on_back()
                     self.scroll_a_page(start=black_or_red_heart_y, end=40)
