@@ -104,30 +104,35 @@ class WorkerThread(threading.Thread):
 
     def find_black_or_red_heart(self) -> int:
         heart_y = self.find_black_heart()
-        if heart_y > 0:
-            return heart_y
         image = self.screenshot()
-        vertical_slice = image[:, 90:92]
-        y_start = -1
-        equal_count = 0
-        for ay in range(numpy.shape(vertical_slice)[0]):
-            if (vertical_slice[ay] == [237, 73, 86, 255]).all():  # this could be heart
-                if y_start == -1:  # no potential red heart found so far
-                    y_start = ay
-                equal_count += 1
-                if equal_count == 2:
-                    # check the text is below contains "Liked" or " likes"
-                    no_likes_image = image[y_start + 110: y_start + 170, 40: 1300]
-                    ocr_result = pytesseract.image_to_string(Image.fromarray(no_likes_image),
-                                                             config='tessedit_char_whitelist=0123456789abcdefghijkLlmnopqrstuvwxyz')
-                    # print(f'ocr_result: {ocr_result}')
-                    if 'Liked' in ocr_result or 'likes' in ocr_result or 'views' in ocr_result:
-                        return y_start
-                    return -1
-            else:
-                y_start = -1
-                equal_count = 0
-        # print('Potential heart not found.')
+        result_y = -1
+        # the code here needs some optimization. Specifically, I need to take two screenshots in a row, which is a waste
+        # however, this code works...
+        if heart_y > 0:
+            result_y = heart_y
+        else:
+            vertical_slice = image[:, 90:92]
+            y_start = -1
+            equal_count = 0
+            for ay in range(numpy.shape(vertical_slice)[0]):
+                if (vertical_slice[ay] == [237, 73, 86, 255]).all():  # this could be heart
+                    if y_start == -1:  # no potential red heart found so far
+                        y_start = ay
+                    equal_count += 1
+                    if equal_count == 2:
+                        result_y = y_start
+                else:
+                    y_start = -1
+                    equal_count = 0
+        if result_y > 0:
+            # print('Potential heart not found.')
+            # check the text is below contains "Liked" or " likes"
+            no_likes_image = image[result_y + 110: result_y + 170, 40: 1300]
+            ocr_result = pytesseract.image_to_string(Image.fromarray(no_likes_image),
+                                                     config='tessedit_char_whitelist=0123456789abcdefghijkLlmnopqrstuvwxyz')
+            # print(f'ocr_result: {ocr_result}')
+            if 'Liked' in ocr_result or 'likes' in ocr_result or 'views' in ocr_result:
+                return result_y
         return -1
 
     def never_visited(self, u_name):
