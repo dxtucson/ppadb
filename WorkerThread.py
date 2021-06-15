@@ -45,7 +45,7 @@ class WorkerThread(threading.Thread):
     cursor = connection.cursor()
     cursor.execute(
         """CREATE TABLE IF NOT EXISTS likes(user_id TEXT NOT NULL PRIMARY KEY, last_visit TEXT NOT NULL, 
-        is_private INTEGER DEFAULT 0)""")
+        is_private INTEGER DEFAULT 0, times_seen INTEGER DEFAULT 1)""")
 
     if len(devices) == 0:
         print('no device attached')
@@ -136,10 +136,13 @@ class WorkerThread(threading.Thread):
             return heart_y
         return -1
 
-    def never_visited(self, u_name):
+    def should_visit(self, u_name):
         # look up db see if user has been visited
         result = self.connection.execute('''SELECT * FROM likes WHERE user_id=?''', (u_name,)).fetchone()
         if result:
+            update_sql = "INSERT OR REPLACE INTO likes (user_id, last_visit, is_private, times_seen) VALUES (?, ?, ?, ?)"
+            self.connection.execute(update_sql, (result[0], result[1], result[2], result[3] + 1))
+            self.connection.commit()
             if result[2]:
                 # the user is known to be private
                 return False
@@ -153,10 +156,12 @@ class WorkerThread(threading.Thread):
             return True
 
     def save_visited(self, user_id: str, success: bool):
-        sql = "INSERT OR REPLACE INTO likes (user_id, last_visit, is_private) VALUES (?, ?, ?)"
+        sql = "INSERT OR REPLACE INTO likes (user_id, last_visit, is_private, times_seen) VALUES (?, ?, ?, ?)"
         timestamp = str(datetime.datetime.now())
+        existing_user = self.connection.execute('''SELECT * FROM likes WHERE user_id=?''', (user_id,)).fetchone()
+        seen_times = existing_user[3] if existing_user else 1
         if success:
-            self.connection.execute(sql, (user_id, timestamp, False))
+            self.connection.execute(sql, (user_id, timestamp, False, seen_times))
             self.connection.commit()
             # print(f'visit user {user_id} done')
         else:
@@ -164,12 +169,12 @@ class WorkerThread(threading.Thread):
             ocr_result = pytesseract.image_to_string(Image.open('screen.png'),
                                                      config='tessedit_char_whitelist=0123456789abcdefghijklmnopPqrstuvwxyz')
             if "Private" in ocr_result:
-                self.connection.execute(sql, (user_id, timestamp, True))
+                self.connection.execute(sql, (user_id, timestamp, True, seen_times))
                 # print(f'visit user {user_id} not done: Private User')
             else:
                 # the visit was not successful due to slow connection
                 # could also be the user has zero image, consider visited for a number of days is fine
-                self.connection.execute(sql, (user_id, timestamp, False))
+                self.connection.execute(sql, (user_id, timestamp, False, seen_times))
             self.connection.commit()
         return
 
@@ -184,7 +189,7 @@ class WorkerThread(threading.Thread):
         for row in range(numpy.shape(vertical_slice)[0]):
             if (vertical_slice[row] == [255, 255, 255, 255]).all():
                 follow_found = False
-            elif (vertical_slice[row] == [219, 219, 219, 255]).all():
+            elif (vertical_slice[row] == [219, 219, 219, 255]).all():  # gray unfollow button
                 if unfollow_found == 0:
                     # update last button Y
                     self.bottom_button_Y = max(self.bottom_button_Y, row + view_top)
@@ -200,7 +205,7 @@ class WorkerThread(threading.Thread):
                 unfollow_found += 1
                 if unfollow_found == 8:
                     unfollow_found = 0
-            elif (vertical_slice[row] == [0, 149, 246, 255]).all():
+            elif (vertical_slice[row] == [0, 149, 246, 255]).all():  # blue follow button
                 if not follow_found:
                     # update follow and user name map
                     current_y_follow = row + view_top
@@ -213,7 +218,7 @@ class WorkerThread(threading.Thread):
                         "\n")[0]
                     self.last_ocr_result = ocr_result
                     # print(f'name of follower: {ocr_result}')
-                    if self.never_visited(ocr_result):
+                    if self.should_visit(ocr_result):
                         follow_buttons_y[current_y_follow] = ocr_result
                 follow_found = True
         return follow_buttons_y
