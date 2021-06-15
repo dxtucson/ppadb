@@ -54,14 +54,13 @@ class WorkerThread(threading.Thread):
     device = devices[0]
 
     black_heart_saved = load('black_heart_saved.npy')
+    current_screen = numpy.array([])  # use one variable instead of multiple to hold current screen
 
     # find start Y of black heart. Return -1 if not found
     def find_black_heart(self) -> int:
-        image = self.screenshot()
-        vertical_slice = image[:, 90:92]
+        vertical_slice = self.current_screen[:, 90:92]
         y_start = -1
         equal_count = 0
-
         for ay in range(numpy.shape(vertical_slice)[0]):
             if y_start == -1:  # no potential heart found so far
                 if (vertical_slice[ay] == self.black_heart_saved[0]).all():  # this could be heart
@@ -102,37 +101,39 @@ class WorkerThread(threading.Thread):
         # print('Potential heart not found.')
         return -1
 
-    def find_black_or_red_heart(self) -> int:
-        heart_y = self.find_black_heart()
-        image = self.screenshot()
-        result_y = -1
-        # the code here needs some optimization. Specifically, I need to take two screenshots in a row, which is a waste
-        # however, this code works...
-        if heart_y > 0:
-            result_y = heart_y
-        else:
-            vertical_slice = image[:, 90:92]
-            y_start = -1
-            equal_count = 0
-            for ay in range(numpy.shape(vertical_slice)[0]):
-                if (vertical_slice[ay] == [237, 73, 86, 255]).all():  # this could be heart
-                    if y_start == -1:  # no potential red heart found so far
-                        y_start = ay
-                    equal_count += 1
-                    if equal_count == 2:
-                        result_y = y_start
-                else:
-                    y_start = -1
-                    equal_count = 0
-        if result_y > 0:
+    def find_red_heart(self) -> int:
+        vertical_slice = self.current_screen[:, 90:92]
+        y_start = -1
+        equal_count = 0
+        for ay in range(numpy.shape(vertical_slice)[0]):
+            if (vertical_slice[ay] == [237, 73, 86, 255]).all():  # this could be heart
+                if y_start == -1:  # no potential red heart found so far
+                    y_start = ay
+                equal_count += 1
+                if equal_count == 2:
+                    break
+            else:
+                y_start = -1
+                equal_count = 0
+        if y_start > 0:
             # print('Potential heart not found.')
             # check the text is below contains "Liked" or " likes"
-            no_likes_image = image[result_y + 110: result_y + 170, 40: 1300]
+            no_likes_image = self.current_screen[y_start + 110: y_start + 170, 40: 1300]
             ocr_result = pytesseract.image_to_string(Image.fromarray(no_likes_image),
                                                      config='tessedit_char_whitelist=0123456789abcdefghijkLlmnopqrstuvwxyz')
             # print(f'ocr_result: {ocr_result}')
             if 'Liked' in ocr_result or 'likes' in ocr_result or 'views' in ocr_result:
-                return result_y
+                return y_start
+        return -1
+
+    def find_black_or_red_heart(self) -> int:
+        heart_y = self.find_black_heart()
+        if heart_y > 0:
+            return heart_y
+        else:
+            heart_y = self.find_red_heart()
+        if heart_y > 0:
+            return heart_y
         return -1
 
     def never_visited(self, u_name):
@@ -175,8 +176,7 @@ class WorkerThread(threading.Thread):
     bottom_button_Y = 0
     last_ocr_result = ''
     def find_follow_button_y_array(self, view_top=follow_top):
-        image = self.screenshot()
-        vertical_slice = image[view_top:self.feed_bottom, self.follow_button_x]
+        vertical_slice = self.current_screen[view_top:self.feed_bottom, self.follow_button_x]
         follow_buttons_y = {}
         # the input will have one column of pixels
         follow_found = False
@@ -190,7 +190,7 @@ class WorkerThread(threading.Thread):
                     self.bottom_button_Y = max(self.bottom_button_Y, row + view_top)
                     current_y_follow = row + view_top
                     self.bottom_button_Y = max(self.bottom_button_Y, current_y_follow)
-                    name_image = image[
+                    name_image = self.current_screen[
                                  current_y_follow - self.name_top_to_follow_button: current_y_follow + self.name_bottom_to_follow_button,
                                  self.name_start_x: self.name_end_x]
                     ocr_result = pytesseract.image_to_string(Image.fromarray(name_image),
@@ -205,7 +205,7 @@ class WorkerThread(threading.Thread):
                     # update follow and user name map
                     current_y_follow = row + view_top
                     self.bottom_button_Y = max(self.bottom_button_Y, current_y_follow)
-                    name_image = image[
+                    name_image = self.current_screen[
                                  current_y_follow - self.name_top_to_follow_button: current_y_follow + self.name_bottom_to_follow_button,
                                  self.name_start_x: self.name_end_x]
                     ocr_result = pytesseract.image_to_string(Image.fromarray(name_image),
@@ -221,8 +221,7 @@ class WorkerThread(threading.Thread):
     def find_first_image_y(self):
         # to like the first image of a user
         # find four pixels of [38, 38, 38, 255], expect one gray pixel and one white pixel
-        image = self.screenshot()
-        vertical_slice = image[:, self.left_thin_margin]
+        vertical_slice = self.current_screen[:, self.left_thin_margin]
         first_y = -1
         continuous_black_pixels = 0
         for row in range(numpy.shape(vertical_slice)[0]):
@@ -235,7 +234,7 @@ class WorkerThread(threading.Thread):
                     continuous_black_pixels = -1
             elif (vertical_slice[row] == [255, 255, 255, 255]).all():
                 if continuous_black_pixels == 4:
-                    if (image[first_y + 240, 240] == image[first_y + 240, 720]).all():
+                    if (self.current_screen[first_y + 240, 240] == self.current_screen[first_y + 240, 720]).all():
                         return -1
                     return first_y + 240  # center_Y of the first image
         return first_y
@@ -260,18 +259,18 @@ class WorkerThread(threading.Thread):
             time.sleep(1)
 
     def scroll_a_page(self, start=feed_bottom, end=follow_top):
+        if start == 0:
+            return
         self.device.shell(f'input touchscreen swipe 500 {start} 500 {end} 2000')
         self.bottom_button_Y = 0
+        self.last_ocr_result = ''
 
     def screenshot(self):
         image = self.device.screencap()
-
         with open('screen.png', 'wb') as f:
             f.write(image)
-
         image = Image.open('screen.png')
-        image = numpy.array(image, dtype=numpy.uint8)
-        return image
+        self.current_screen = numpy.array(image, dtype=numpy.uint8)
 
     def visit_users_and_like(self, y_map):
         for y in y_map.keys():
@@ -279,10 +278,12 @@ class WorkerThread(threading.Thread):
                 break
             self.device.shell(f'input tap {self.half_width} {y}')  # tap on user
             self.sleep1()
+            self.screenshot()
             first_image_y = self.find_first_image_y()
             if first_image_y > 0:  # found an image to like
                 self.device.shell(f'input tap 250 {first_image_y}')  # tap on image
-                self.sleep1()
+                self.sleep_half()
+                self.screenshot()
                 black_heart_y = self.find_black_heart()
                 if black_heart_y > 1300:  # in case the user's icon has heart
                     self.device.shell(f'input tap 91 {black_heart_y + 10}')
@@ -295,55 +296,58 @@ class WorkerThread(threading.Thread):
                 self.tap_on_back()  # to user view
                 self.sleep_half()
                 self.tap_on_back()  # to follower view
-                self.sleep_half()
             else:  # private user or no image
                 self.save_visited(user_id=y_map[y], success=False)
                 self.tap_on_back()
 
     def run(self, *args, **kwargs):
-
+        copy_of_last_ocr_result = ''
         while self.ui_state == UiState.running or self.ui_state == UiState.paused:
             if self.run_mode == RunMode.posts:
+                self.screenshot()
                 black_or_red_heart_y = self.find_black_or_red_heart()
                 if black_or_red_heart_y > 0:
                     self.device.shell(f'input tap 91 {black_or_red_heart_y + 150}')
                     # now in likes page
                     self.sleep_half()
-                    cur_map = self.find_follow_button_y_array(view_top=self.feed_top)
-                    last_ocr_copy = ''
-                    while not cur_map and last_ocr_copy != self.last_ocr_result and self.ui_state == UiState.running:
+                    while self.ui_state == UiState.running:
+                        self.screenshot()
+                        cur_map = self.find_follow_button_y_array(view_top=self.feed_top)
+                        if len(copy_of_last_ocr_result) > 0 and copy_of_last_ocr_result == self.last_ocr_result:
+                            break
+                        if cur_map:
+                            self.visit_users_and_like(cur_map)
+                        copy_of_last_ocr_result = str(self.last_ocr_result)
                         self.scroll_a_page(start=self.bottom_button_Y,
                                            end=self.feed_top - self.name_bottom_to_follow_button)
-                        last_ocr_copy = str(self.last_ocr_result)
-                        cur_map = self.find_follow_button_y_array(view_top=self.feed_top)
-
-                    last_ocr_copy = ''
-                    while last_ocr_copy != self.last_ocr_result and self.ui_state == UiState.running:
-                        self.visit_users_and_like(cur_map)
-                        self.scroll_a_page(start=self.bottom_button_Y,
-                                           end=self.feed_top - self.name_bottom_to_follow_button)
-                        last_ocr_copy = self.last_ocr_result
-                        cur_map = self.find_follow_button_y_array(view_top=self.feed_top)
                     self.tap_on_back()
                     self.scroll_a_page(start=black_or_red_heart_y, end=40)
                 else:
                     self.device.shell(f'input touchscreen swipe 500 2536 500 1200 1000')
             elif self.run_mode == RunMode.continuous:  # same with like_place
+                self.screenshot()
                 black_heart_y = self.find_black_heart()
                 if black_heart_y > 0:
                     self.device.shell(f'input tap 91 {black_heart_y + 10}')
                     self.likes.set(self.likes.get() + 1)
                     self.device.shell(f'input touchscreen swipe 500 {black_heart_y} 500 100 1000')
+                    self.screenshot()
                 else:
                     # scroll to half and look for heart again
                     self.device.shell(f'input touchscreen swipe 500 2536 500 1200 1000')
+                    self.screenshot()
             elif self.run_mode == RunMode.followers:
                 # find follow buttons
+                self.screenshot()
                 followers_y = self.find_follow_button_y_array()
-                while not followers_y and self.ui_state == UiState.running:
-                    self.scroll_a_page(start=self.bottom_button_Y,
-                                       end=self.follow_top - self.name_bottom_to_follow_button)
-                    followers_y = self.find_follow_button_y_array()
-                self.visit_users_and_like(followers_y)
-                self.scroll_a_page(start=self.bottom_button_Y, end=self.follow_top - self.name_bottom_to_follow_button)
+                if len(copy_of_last_ocr_result) > 0 and copy_of_last_ocr_result == self.last_ocr_result:
+                    self.ui_state = UiState.stopped
+                    break
+                if followers_y:
+                    self.visit_users_and_like(followers_y)
+                copy_of_last_ocr_result = str(self.last_ocr_result)
+                self.scroll_a_page(start=self.bottom_button_Y,
+                                   end=self.follow_top - self.name_bottom_to_follow_button)
+                self.sleep_half()
+
             self.sleep1()

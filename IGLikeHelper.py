@@ -7,18 +7,19 @@ from WorkerThread import WorkerThread
 
 def start_clicked():
     global worker_thread, run_mode, rb_1, rb_2, rb_3, counter_var
-
+    ignore_button = True
     if worker_thread is None or worker_thread.ui_state == UiState.stopped:
+        ignore_button = False
         worker_thread = WorkerThread(run_mode, counter_var)
         worker_thread.start()
-        rb_1['state'] = DISABLED
-        rb_2['state'] = DISABLED
-        rb_3['state'] = DISABLED
     elif worker_thread.ui_state == UiState.paused:
+        ignore_button = False
         worker_thread.ui_state = UiState.running
+    if not ignore_button:
         rb_1['state'] = DISABLED
         rb_2['state'] = DISABLED
         rb_3['state'] = DISABLED
+        root.after(5000, update_ui)
 
 
 def pause_clicked():
@@ -58,6 +59,20 @@ def on_closing():
     if worker_thread is not None:
         worker_thread.ui_state = UiState.stopped
     root.destroy()
+
+
+def update_ui():
+    if worker_thread is None:
+        rb_1['state'] = NORMAL
+        rb_2['state'] = NORMAL
+        rb_3['state'] = NORMAL
+    elif worker_thread is not None:
+        if worker_thread.ui_state == UiState.stopped:
+            rb_1['state'] = NORMAL
+            rb_2['state'] = NORMAL
+            rb_3['state'] = NORMAL
+        else:
+            root.after(5000, update_ui)
 
 
 worker_thread: WorkerThread = None
