@@ -189,23 +189,23 @@ class WorkerThread(threading.Thread):
         for row in range(numpy.shape(vertical_slice)[0]):
             if (vertical_slice[row] == [255, 255, 255, 255]).all():
                 follow_found = False
-            elif (vertical_slice[row] == [219, 219, 219, 255]).all():  # gray unfollow button
-                if unfollow_found == 0:
-                    # update last button Y
-                    self.bottom_button_Y = max(self.bottom_button_Y, row + view_top)
-                    current_y_follow = row + view_top
-                    self.bottom_button_Y = max(self.bottom_button_Y, current_y_follow)
-                    name_image = self.current_screen[
-                                 current_y_follow - self.name_top_to_follow_button: current_y_follow + self.name_bottom_to_follow_button,
-                                 self.name_start_x: self.name_end_x]
-                    ocr_result = pytesseract.image_to_string(Image.fromarray(name_image),
-                                                             config='tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyz').split(
-                        "\n")[0]
-                    self.last_ocr_result = ocr_result
-                unfollow_found += 1
-                if unfollow_found == 8:
-                    unfollow_found = 0
-            elif (vertical_slice[row] == [0, 149, 246, 255]).all():  # blue follow button
+            elif (vertical_slice[row] == [219, 219, 219, 255]).all() and (
+                    row + 97 < numpy.shape(vertical_slice)[0] and (vertical_slice[row + 97] == [219, 219, 219,
+                                                                                                255]).all()):  # gray unfollow button, ignore partially shown buttons
+                # update last button Y
+                current_y_follow = row + view_top
+                self.bottom_button_Y = max(self.bottom_button_Y, current_y_follow)
+                name_image = self.current_screen[
+                             current_y_follow - self.name_top_to_follow_button: current_y_follow + self.name_bottom_to_follow_button,
+                             self.name_start_x: self.name_end_x]
+                ocr_result = pytesseract.image_to_string(Image.fromarray(name_image),
+                                                         config='tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyz').split(
+                    "\n")[0]
+                self.last_ocr_result = ocr_result
+
+            elif (vertical_slice[row] == [0, 149, 246, 255]).all() and (row + 97 < numpy.shape(vertical_slice)[0] and (
+                    vertical_slice[row + 97] == [0, 149, 246,
+                                                 255]).all()):  # blue follow button, ignore partially shown buttons
                 if not follow_found:
                     # update follow and user name map
                     current_y_follow = row + view_top
@@ -264,6 +264,7 @@ class WorkerThread(threading.Thread):
             time.sleep(1)
 
     def scroll_a_page(self, start=feed_bottom, end=follow_top):
+        print(f'scroll up called. start={start}, end={end}')
         if start == 0:
             return
         self.device.shell(f'input touchscreen swipe 500 {start} 500 {end} 2000')
