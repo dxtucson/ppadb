@@ -65,6 +65,9 @@ class WorkerThread(threading.Thread):
                     # check middle
                     if (vertical_slice[ay + 28] == [255, 255, 255, 255]).all():
                         return ay
+            elif (vertical_slice[ay] == [237, 73, 86, 255]).all() and (
+                    vertical_slice[ay + 28] == [237, 73, 86, 255]).all():
+                return -1
         # print('Potential heart not found.')
         return -1
 
