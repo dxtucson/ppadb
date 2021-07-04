@@ -53,51 +53,18 @@ class WorkerThread(threading.Thread):
 
     device = devices[0]
 
-    black_heart_saved = load('black_heart_saved.npy')
     current_screen = numpy.array([])  # use one variable instead of multiple to hold current screen
 
     # find start Y of black heart. Return -1 if not found
     def find_black_heart(self) -> int:
-        vertical_slice = self.current_screen[:, 90:92]
-        y_start = -1
-        equal_count = 0
-        for ay in range(numpy.shape(vertical_slice)[0]):
-            if y_start == -1:  # no potential heart found so far
-                if (vertical_slice[ay] == self.black_heart_saved[0]).all():  # this could be heart
-                    y_start = ay
-                    equal_count = 1
-            elif (vertical_slice[ay] == self.black_heart_saved[equal_count]).all():  # one more row equal
-                equal_count += 1
-                if equal_count == numpy.shape(self.black_heart_saved)[0]:  # found entire heart
-                    if y_start < self.feed_top:  # higher than toolbar
-                        # print('No heart found: y_start < feed_top.')
-                        return -1
-                    elif y_start + equal_count > self.feed_bottom:  # lower than bottom bar
-                        # print('No heart found: y_start + equal_count > feed_bottom.')
-                        return -1
-                    else:
-                        top_check = y_start - 5
-                        bottom_check = y_start + equal_count + 5
-                        if top_check < self.feed_top:  # scroll down 10px to do the check
-                            # print('Could not verify: top_check < feed_top')
-                            return -1
-                        elif bottom_check > self.feed_bottom:  # scroll up 10px to do the check
-                            # print('Could not verify: bottom_check > feed_bottom')
-                            return -1
-                        # the potential heart has white pixels on both top and bottom
-                        else:
-                            for i in numpy.nditer(vertical_slice[top_check]):
-                                if i != 255:
-                                    # print('top_check is not all white!')
-                                    return -1
-                            for i in numpy.nditer(vertical_slice[bottom_check]):
-                                if i != 255:
-                                    # print('bottom_check is not all white!')
-                                    return -1
-                            return y_start
-            else:
-                y_start = -1
-                equal_count = 0
+        vertical_slice = self.current_screen[:, 91]
+        for ay in range(numpy.shape(vertical_slice)[0] - 57):
+            if (vertical_slice[ay] == [38, 38, 38, 255]).all():
+                # check ay + 57
+                if (vertical_slice[ay + 57] == [38, 38, 38, 255]).all():
+                    # check middle
+                    if (vertical_slice[ay + 28] == [255, 255, 255, 255]).all():
+                        return ay
         # print('Potential heart not found.')
         return -1
 
