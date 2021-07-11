@@ -205,12 +205,16 @@ class WorkerThread(threading.Thread):
                     first_y = row
                 continuous_black_pixels += 1
                 if continuous_black_pixels > 4:
-                    first_y = 0
-                    continuous_black_pixels = -1
+                    first_y = -1
+                    continuous_black_pixels = 0
             elif (vertical_slice[row] == [255, 255, 255, 255]).all():
                 if continuous_black_pixels == 4:
-                    if (self.current_screen[first_y + 240, 240] == self.current_screen[first_y + 240, 720]).all():
-                        return -1
+                    if (self.current_screen[first_y + 240, 240] == self.current_screen[first_y + 240, 720]).all() and (
+                            self.current_screen[first_y + 240, 720] == self.current_screen[first_y + 240, 1200]).all():
+                        if (self.current_screen[first_y + 240, 240] == [239, 239, 239, 255]).all():
+                            return first_y + 240
+                        else:
+                            return -1
                     return first_y + 240  # center_Y of the first image
         return first_y
 
@@ -260,13 +264,17 @@ class WorkerThread(threading.Thread):
                 self.device.shell(f'input tap 250 {first_image_y}')  # tap on image
                 self.sleep_half()
                 self.screenshot()
-                black_heart_y = self.find_black_heart()
-                if black_heart_y > 1300:  # in case the user's icon has heart
-                    self.device.shell(f'input tap 91 {black_heart_y + 10}')
+                red_heart_y = self.find_red_heart()
+                if red_heart_y > 1300:  # in case this image was liked before
                     self.save_visited(user_id=y_map[y], success=True)
-                    self.likes.set(self.likes.get() + 1)
                 else:
-                    self.save_visited(user_id=y_map[y], success=True)
+                    black_heart_y = self.find_black_heart()
+                    if black_heart_y > 1300:
+                        self.device.shell(f'input tap 91 {black_heart_y + 10}')
+                        self.save_visited(user_id=y_map[y], success=True)
+                        self.likes.set(self.likes.get() + 1)
+                    else:
+                        self.save_visited(user_id=y_map[y], success=True)
                 if self.ui_state == UiState.stopped:
                     break
                 self.tap_on_back()  # to user view
