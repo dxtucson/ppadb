@@ -238,7 +238,7 @@ class WorkerThread(threading.Thread):
             time.sleep(1)
 
     def scroll_a_page(self, start=feed_bottom, end=follow_top):
-        print(f'scroll up called. start={start}, end={end}')
+        # print(f'scroll up called. start={start}, end={end}')
         if start == 0:
             return
         self.device.shell(f'input touchscreen swipe 500 {start} 500 {end} 2000')
@@ -324,12 +324,19 @@ class WorkerThread(threading.Thread):
                 # find follow buttons
                 self.screenshot()
                 followers_y = self.find_follow_button_y_array()
-                if len(copy_of_last_ocr_result) > 0 and copy_of_last_ocr_result == self.last_ocr_result:
-                    self.ui_state = UiState.stopped
-                    break
+
+                if len(followers_y) == 0:
+                    # see if the screen has "suggestions for you"
+                    suggested_area = self.current_screen[466: 600, :]
+                    ocr_result = pytesseract.image_to_string(Image.fromarray(suggested_area),
+                                                             config='tessedit_char_whitelist=0123456789abcdefghijklmnopqrsStuvwxyz').split(
+                        "\n")[0]
+                    if ocr_result.startswith('Suggestions for you'):
+                        self.ui_state = UiState.stopped
+                        break
+
                 if followers_y:
                     self.visit_users_and_like(followers_y)
-                copy_of_last_ocr_result = str(self.last_ocr_result)
                 self.scroll_a_page(start=self.bottom_button_Y,
                                    end=self.follow_top - self.name_bottom_to_follow_button)
                 self.sleep_half()
