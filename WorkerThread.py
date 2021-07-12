@@ -233,6 +233,12 @@ class WorkerThread(threading.Thread):
         else:
             time.sleep(0.5)
 
+    def sleep_30_min(self):
+        if self.ui_state == UiState.paused:
+            self.pause_for_a_sec()
+        else:
+            time.sleep(1800)
+
     def pause_for_a_sec(self):
         while self.ui_state == UiState.paused:
             time.sleep(1)
@@ -258,6 +264,7 @@ class WorkerThread(threading.Thread):
                 break
             self.device.shell(f'input tap {self.half_width} {y}')  # tap on user
             self.sleep1()
+            self.sleep1()
             self.screenshot()
             first_image_y = self.find_first_image_y()
             if first_image_y > 0:  # found an image to like
@@ -273,6 +280,8 @@ class WorkerThread(threading.Thread):
                         self.device.shell(f'input tap 91 {black_heart_y + 10}')
                         self.save_visited(user_id=y_map[y], success=True)
                         self.likes.set(self.likes.get() + 1)
+                        if self.likes.get() % 500 == 0:
+                            self.sleep_30_min()
                     else:
                         self.save_visited(user_id=y_map[y], success=True)
                 if self.ui_state == UiState.stopped:
@@ -324,7 +333,6 @@ class WorkerThread(threading.Thread):
                 # find follow buttons
                 self.screenshot()
                 followers_y = self.find_follow_button_y_array()
-
                 if len(followers_y) == 0:
                     # see if the screen has "suggestions for you"
                     suggested_area = self.current_screen[466: 600, :]
@@ -334,7 +342,6 @@ class WorkerThread(threading.Thread):
                     if ocr_result.startswith('Suggestions for you'):
                         self.ui_state = UiState.stopped
                         break
-
                 if followers_y:
                     self.visit_users_and_like(followers_y)
                 self.scroll_a_page(start=self.bottom_button_Y,
