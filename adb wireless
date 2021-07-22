@@ -1,3 +1,3 @@
-adb shell "ifconfig | grep -A 1 wlan0 | tail -n 1 | cut -f2 -d: | cut -f1 -d' '"
-adb tcpip 5555
-adb connect 192.168.1.72:5555
+./adb shell "ifconfig | grep -A 1 wlan0 | tail -n 1 | cut -f2 -d: | cut -f1 -d' '"
+./adb tcpip 5555
+./adb connect 192.168.1.72:5555

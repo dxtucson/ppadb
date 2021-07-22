@@ -262,36 +262,47 @@ class WorkerThread(threading.Thread):
         for y in y_map.keys():
             if self.ui_state == UiState.stopped:
                 break
+            elif self.ui_state == UiState.paused:
+                self.pause_for_a_sec()
             self.device.shell(f'input tap {self.half_width} {y}')  # tap on user
             self.sleep1()
-            self.sleep1()
+            self.sleep_half()
             self.screenshot()
             first_image_y = self.find_first_image_y()
             if first_image_y > 0:  # found an image to like
                 self.device.shell(f'input tap 250 {first_image_y}')  # tap on image
                 self.sleep_half()
                 self.screenshot()
-                red_heart_y = self.find_red_heart()
-                if red_heart_y > 1300:  # in case this image was liked before
-                    self.save_visited(user_id=y_map[y], success=True)
-                else:
-                    black_heart_y = self.find_black_heart()
-                    if black_heart_y > 1300:
-                        self.device.shell(f'input tap 91 {black_heart_y + 10}')
+                # if "Posts" are not found, it means clicking on the first image failed. Only one back is needed
+                posts_area = self.current_screen[150: 235, 230: 445]
+                ocr_result = pytesseract.image_to_string(Image.fromarray(posts_area),
+                                                         config='tessedit_char_whitelist=0123456789abcdefghijklmnoPpqrsStuvwxyz').split(
+                    "\n")[0]
+                if ocr_result.startswith('Posts'):
+                    # normal flow
+                    red_heart_y = self.find_red_heart()
+                    if red_heart_y > 1300:  # in case this image was liked before
                         self.save_visited(user_id=y_map[y], success=True)
-                        self.likes.set(self.likes.get() + 1)
-                        if self.likes.get() % 500 == 0:
-                            self.sleep_30_min()
                     else:
-                        self.save_visited(user_id=y_map[y], success=True)
-                if self.ui_state == UiState.stopped:
-                    break
-                self.tap_on_back()  # to user view
-                self.sleep_half()
-                self.tap_on_back()  # to follower view
-            else:  # private user or no image
-                self.save_visited(user_id=y_map[y], success=False)
-                self.tap_on_back()
+                        black_heart_y = self.find_black_heart()
+                        if black_heart_y > 1300:
+                            self.device.shell(f'input tap 91 {black_heart_y + 10}')
+                            self.save_visited(user_id=y_map[y], success=True)
+                            self.likes.set(self.likes.get() + 1)
+                            if self.likes.get() % 500 == 0:
+                                self.sleep_30_min()
+                        else:
+                            self.save_visited(user_id=y_map[y], success=True)
+                    if self.ui_state == UiState.stopped:
+                        break
+                    self.tap_on_back()  # to user view
+                    self.sleep_half()
+                    self.tap_on_back()  # to follower view
+                    return
+
+            # private user or no image
+            self.save_visited(user_id=y_map[y], success=False)
+            self.tap_on_back()
 
     def run(self, *args, **kwargs):
         copy_of_last_ocr_result = ''
