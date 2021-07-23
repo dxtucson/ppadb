@@ -286,7 +286,7 @@ class WorkerThread(threading.Thread):
                     else:
                         black_heart_y = self.find_black_heart()
                         if black_heart_y > 1300:
-                            self.device.shell(f'input tap 91 {black_heart_y + 10}')
+                            self.device.shell(f'input tap 91 {black_heart_y}')
                             self.save_visited(user_id=y_map[y], success=True)
                             self.likes.set(self.likes.get() + 1)
                             if self.likes.get() % 500 == 0:
@@ -332,7 +332,7 @@ class WorkerThread(threading.Thread):
                 self.screenshot()
                 black_heart_y = self.find_black_heart()
                 if black_heart_y > 0:
-                    self.device.shell(f'input tap 91 {black_heart_y + 10}')
+                    self.device.shell(f'input tap 91 {black_heart_y}')
                     self.likes.set(self.likes.get() + 1)
                     self.device.shell(f'input touchscreen swipe 500 {black_heart_y} 500 100 1000')
                     self.screenshot()
