@@ -150,6 +150,7 @@ class WorkerThread(threading.Thread):
 
     bottom_button_Y = 0
     last_ocr_result = ''
+
     def find_follow_button_y_array(self, view_top=follow_top):
         vertical_slice = self.current_screen[view_top:self.feed_bottom, self.follow_button_x]
         follow_buttons_y = {}
@@ -287,6 +288,14 @@ class WorkerThread(threading.Thread):
                         black_heart_y = self.find_black_heart()
                         if black_heart_y > 1300:
                             self.device.shell(f'input tap 91 {black_heart_y}')
+                            self.screenshot()
+                            views_and_likes_area = self.current_screen[150:230, 220:720]
+                            likes_ocr = pytesseract.image_to_string(Image.fromarray(views_and_likes_area),
+                                                                    config='tessedit_char_whitelist=0123456789abcdefghijkLlmnopqrstuVvwxyz').split(
+                                "\n")[0]
+                            if likes_ocr.startswith('Likes') or likes_ocr.startswith('Views'):
+                                # entered likes view by error, one more click is needed
+                                self.tap_on_back()
                             self.save_visited(user_id=y_map[y], success=True)
                             self.likes.set(self.likes.get() + 1)
                             if self.likes.get() % 500 == 0:
