@@ -355,17 +355,15 @@ class WorkerThread(threading.Thread):
                 followers_y = self.find_follow_button_y_array()
                 if len(followers_y) == 0:
                     # see if the screen has "suggestions for you"
-                    suggested_area = self.current_screen[466: 600, :]
+                    suggested_area = self.current_screen[450: 650, :]
                     ocr_result = pytesseract.image_to_string(Image.fromarray(suggested_area),
                                                              config='tessedit_char_whitelist=0123456789abcdefghijklmnopqrsStuvwxyz').split(
                         "\n")[0]
-                    if ocr_result.startswith('Suggestions for you'):
+                    # print(ocr_result)
+                    if "Suggestions for you" in ocr_result:
                         self.ui_state = UiState.stopped
                         break
                 if followers_y:
                     self.visit_users_and_like(followers_y)
                 self.scroll_a_page(start=self.bottom_button_Y,
                                    end=self.follow_top - self.name_bottom_to_follow_button)
-                self.sleep_half()
-
-            self.sleep1()
