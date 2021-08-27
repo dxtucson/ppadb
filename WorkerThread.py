@@ -68,7 +68,15 @@ class WorkerThread(threading.Thread):
                 if (vertical_slice[ay + 57] == [38, 38, 38, 255]).all():
                     # check middle
                     if (vertical_slice[ay + 28] == [255, 255, 255, 255]).all():
-                        return ay
+                        # at least 40 continuous white pixels are needed to have an accurate judgement for heart
+                        # the original logic is proven to be not accurate enough with a screenshot
+                        this_is_heart = True
+                        for pixel in vertical_slice[ay + 8: ay + 48]:
+                            if not (pixel == [255, 255, 255, 255]).all():
+                                this_is_heart = False
+                                break
+                        if this_is_heart:
+                            return ay
             elif (vertical_slice[ay] == [237, 73, 86, 255]).all() and (
                     vertical_slice[ay + 28] == [237, 73, 86, 255]).all():
                 return -1
