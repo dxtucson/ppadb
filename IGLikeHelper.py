@@ -10,7 +10,7 @@ def start_clicked():
     ignore_button = True
     if worker_thread is None or worker_thread.ui_state == UiState.stopped:
         ignore_button = False
-        worker_thread = WorkerThread(run_mode, counter_var)
+        worker_thread = WorkerThread(run_mode, counter_var, show_exceeded)
         worker_thread.start()
     elif worker_thread.ui_state == UiState.paused:
         ignore_button = False
@@ -75,6 +75,17 @@ def update_ui():
             root.after(5000, update_ui)
 
 
+def show_exceeded(detail):
+    exceeded_label.place(x=180, y=320, anchor='center')
+    exceeded_var.set(detail)
+    rb_1['state'] = DISABLED
+    rb_2['state'] = DISABLED
+    rb_3['state'] = DISABLED
+    start_button['state'] = DISABLED
+    pause_button['state'] = DISABLED
+    stop_button['state'] = DISABLED
+
+
 worker_thread: WorkerThread = None
 run_mode = RunMode.followers
 
@@ -82,7 +93,7 @@ root = Tk()
 root.title('IG Awareness Helper')
 root.resizable(False, False)
 root.protocol("WM_DELETE_WINDOW", on_closing)
-c = Canvas(root, width=360, height=320, bg='#f2f2f2')
+c = Canvas(root, width=360, height=340, bg='#f2f2f2')
 c.pack()
 
 radio_selection = IntVar()
@@ -90,6 +101,8 @@ radio_selection.set(2)
 
 counter_var = IntVar()
 counter_var.set(0)
+exceeded_var = StringVar()
+exceeded_var.set('Limit exceeded.')
 
 rb_1 = Radiobutton(root, font='Arial 11', width='12', text="Continuous", padx=20, value=1, variable=radio_selection,
                    command=selected)
@@ -103,7 +116,7 @@ rb_3 = Radiobutton(root, font='Arial 11', width='12', text="Likes on post", padx
                    command=selected)
 rb_3.place(x=128, y=80, width=120, height=30)
 
-c.create_text(180, 130, font='Arial 13', text='Posts you\'ve liked:')
+c.create_text(180, 130, font='Arial 13', text='Total likes in 24 hrs:')
 counter_label = Label(root, font='Arial 20', textvariable=counter_var)
 counter_label.place(x=180, y=170, anchor='center')
 
@@ -118,6 +131,12 @@ stop_button.place(x=230, y=200, width=50, height=40)
 
 screenshot_button = Button(root, font='Arial 11', text='Screenshot', bd='2', command=screenshot_clicked)
 screenshot_button.place(x=130, y=260, width=100, height=40)
+
+exceeded_label = Label(root, font='Arial 10', textvariable=exceeded_var)
+exceeded_label.configure(foreground="red")
+
+check_thread = WorkerThread(run_mode, counter_var, show_exceeded)
+check_thread.check_limit_exceeded()
 
 root.mainloop()
 

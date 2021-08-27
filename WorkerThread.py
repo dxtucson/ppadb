@@ -12,13 +12,18 @@ from UiState import UiState
 import sqlite3
 import datetime
 
+# Instagram has a limit of 1000 per 24 hours
+likes_per_day_limit = 950
+days_before_revisit = 100
+
 
 class WorkerThread(threading.Thread):
 
-    def __init__(self, mode: RunMode, count: IntVar):
+    def __init__(self, mode: RunMode, count: IntVar, exceeded):
         threading.Thread.__init__(self)
         self.run_mode = mode
         self.likes = count
+        self.show_limit_exceeded_label = exceeded
 
     ui_state = UiState.running
     run_mode = RunMode.followers
@@ -34,7 +39,6 @@ class WorkerThread(threading.Thread):
     name_end_x = 990
     name_top_to_follow_button = 65
     name_bottom_to_follow_button = 170
-    days_before_revisit = 30
 
     os.system('cmd /c "C:\\Users\\David\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb devices"')
     adb = Client(host='127.0.0.1', port=5037)
@@ -45,7 +49,7 @@ class WorkerThread(threading.Thread):
     cursor = connection.cursor()
     cursor.execute(
         """CREATE TABLE IF NOT EXISTS likes(user_id TEXT NOT NULL PRIMARY KEY, last_visit TEXT NOT NULL, 
-        is_private INTEGER DEFAULT 0, times_seen INTEGER DEFAULT 1)""")
+        is_private INTEGER DEFAULT 0, times_seen INTEGER DEFAULT 1, like_success INTEGER DEFAULT 0)""")
 
     if len(devices) == 0:
         print('no device attached')
@@ -110,43 +114,56 @@ class WorkerThread(threading.Thread):
         # look up db see if user has been visited
         result = self.connection.execute('''SELECT * FROM likes WHERE user_id=?''', (u_name,)).fetchone()
         if result:
-            update_sql = "INSERT OR REPLACE INTO likes (user_id, last_visit, is_private, times_seen) VALUES (?, ?, ?, ?)"
-            self.connection.execute(update_sql, (result[0], result[1], result[2], result[3] + 1))
+            update_sql = "INSERT OR REPLACE INTO likes (user_id, last_visit, is_private, times_seen, like_success) VALUES (?, ?, ?, ?, ?)"
+            self.connection.execute(update_sql, (result[0], result[1], result[2], result[3] + 1, result[4]))
             self.connection.commit()
             if result[2]:
                 # the user is known to be private
                 return False
             time_since_last_visit = datetime.datetime.now() - datetime.datetime.strptime(result[1],
                                                                                          '%Y-%m-%d %H:%M:%S.%f')
-            if time_since_last_visit.days > self.days_before_revisit:
+            if time_since_last_visit.days > days_before_revisit:
                 return True
             else:
                 return False
         else:
             return True
 
-    def save_visited(self, user_id: str, success: bool):
-        sql = "INSERT OR REPLACE INTO likes (user_id, last_visit, is_private, times_seen) VALUES (?, ?, ?, ?)"
+    def update_db_after_visit(self, user_id: str, visit_success: bool, clicked_on_like: bool, is_private: bool):
+        sql = "INSERT OR REPLACE INTO likes (user_id, last_visit, is_private, times_seen, like_success) VALUES (?, ?, ?, ?, ?)"
         timestamp = str(datetime.datetime.now())
         existing_user = self.connection.execute('''SELECT * FROM likes WHERE user_id=?''', (user_id,)).fetchone()
         seen_times = existing_user[3] if existing_user else 1
-        if success:
-            self.connection.execute(sql, (user_id, timestamp, False, seen_times))
-            self.connection.commit()
-            # print(f'visit user {user_id} done')
-        else:
-            # check if the account is private
-            ocr_result = pytesseract.image_to_string(Image.open('screen.png'),
-                                                     config='tessedit_char_whitelist=0123456789abcdefghijklmnopPqrstuvwxyz')
-            if "Private" in ocr_result:
-                self.connection.execute(sql, (user_id, timestamp, True, seen_times))
-                # print(f'visit user {user_id} not done: Private User')
+        if visit_success:
+            if clicked_on_like:
+                self.connection.execute(sql, (user_id, timestamp, False, seen_times, True))
             else:
-                # the visit was not successful due to slow connection
-                # could also be the user has zero image, consider visited for a number of days is fine
-                self.connection.execute(sql, (user_id, timestamp, False, seen_times))
+                self.connection.execute(sql, (user_id, timestamp, False, seen_times, False))
             self.connection.commit()
-        return
+        elif is_private:
+            self.connection.execute(sql, (user_id, timestamp, True, seen_times, False))
+            self.connection.commit()
+        elif not existing_user:
+            self.connection.execute(sql, (user_id, timestamp, False, 1, False))
+            self.connection.commit()
+
+    def check_limit_exceeded(self):
+        current_time = datetime.datetime.now() - datetime.timedelta(hours=24)
+        count = self.connection.execute(
+            '''SELECT COUNT(*) AS likes_in_24_hrs, * FROM likes WHERE like_success == 1 AND last_visit >= ?''',
+            (current_time,)).fetchone()
+        if count[0] > self.likes.get():
+            self.likes.set(count[0])
+        if count[0] >= likes_per_day_limit:
+            self.ui_state = UiState.reached_limit
+            # find out when is safe to resume
+            # Calculate when another 200 likes will pass 24 hours.
+            row_200th = self.connection.execute(
+                '''SELECT last_visit FROM likes WHERE last_visit >= ? ORDER BY last_visit LIMIT 1 OFFSET 200''',
+                (current_time,)).fetchone()[0]
+            safe_datetime = str(
+                datetime.datetime.strptime(row_200th, '%Y-%m-%d %H:%M:%S.%f') + datetime.timedelta(hours=24))[:16]
+            self.show_limit_exceeded_label(f'More likes will be available after {safe_datetime}')
 
     bottom_button_Y = 0
     last_ocr_result = ''
@@ -156,7 +173,6 @@ class WorkerThread(threading.Thread):
         follow_buttons_y = {}
         # the input will have one column of pixels
         follow_found = False
-        unfollow_found = 0
         for row in range(numpy.shape(vertical_slice)[0]):
             if (vertical_slice[row] == [255, 255, 255, 255]).all():
                 follow_found = False
@@ -234,12 +250,6 @@ class WorkerThread(threading.Thread):
         else:
             time.sleep(0.5)
 
-    def sleep_30_min(self):
-        if self.ui_state == UiState.paused:
-            self.pause_for_a_sec()
-        else:
-            time.sleep(1800)
-
     def pause_for_a_sec(self):
         while self.ui_state == UiState.paused:
             time.sleep(1)
@@ -261,7 +271,7 @@ class WorkerThread(threading.Thread):
 
     def visit_users_and_like(self, y_map):
         for y in y_map.keys():
-            if self.ui_state == UiState.stopped:
+            if self.ui_state == UiState.stopped or self.ui_state == UiState.reached_limit:
                 break
             elif self.ui_state == UiState.paused:
                 self.pause_for_a_sec()
@@ -269,8 +279,19 @@ class WorkerThread(threading.Thread):
             self.sleep1()
             self.sleep_half()
             self.screenshot()
+
+            private_user = False
+            post_seen = False
+            like_clicked = False
+
             first_image_y = self.find_first_image_y()
-            if first_image_y > 0:  # found an image to like
+            if first_image_y < 0:  # private or too slow
+                ocr_result = pytesseract.image_to_string(self.current_screen,
+                                                         config='tessedit_char_whitelist=0123456789abcdefghijklmnopPqrstuvwxyz')
+                if "Private" in ocr_result:
+                    private_user = True
+
+            else:  # found an image to like
                 self.device.shell(f'input tap 250 {first_image_y}')  # tap on image
                 self.sleep_half()
                 self.screenshot()
@@ -281,13 +302,13 @@ class WorkerThread(threading.Thread):
                     "\n")[0]
                 if ocr_result.startswith('Posts'):
                     # normal flow
+                    post_seen = True
                     red_heart_y = self.find_red_heart()
-                    if red_heart_y > 1300:  # in case this image was liked before
-                        self.save_visited(user_id=y_map[y], success=True)
-                    else:
+                    if red_heart_y < 0:  # Never liked this post
                         black_heart_y = self.find_black_heart()
                         if black_heart_y > 1300:
                             self.device.shell(f'input tap 91 {black_heart_y}')
+                            like_clicked = True
                             self.screenshot()
                             views_and_likes_area = self.current_screen[150:230, 220:720]
                             likes_ocr = pytesseract.image_to_string(Image.fromarray(views_and_likes_area),
@@ -296,22 +317,17 @@ class WorkerThread(threading.Thread):
                             if likes_ocr.startswith('Likes') or likes_ocr.startswith('Views'):
                                 # entered likes view by error, one more click is needed
                                 self.tap_on_back()
-                            self.save_visited(user_id=y_map[y], success=True)
-                            self.likes.set(self.likes.get() + 1)
-                            if self.likes.get() % 500 == 0:
-                                self.sleep_30_min()
-                        else:
-                            self.save_visited(user_id=y_map[y], success=True)
-                    if self.ui_state == UiState.stopped:
-                        break
-                    self.tap_on_back()  # to user view
-                    self.sleep_half()
-                    self.tap_on_back()  # to follower view
-                    return
+                                like_clicked = False
 
-            # private user or no image
-            self.save_visited(user_id=y_map[y], success=False)
-            self.tap_on_back()
+            self.update_db_after_visit(user_id=y_map[y], visit_success=post_seen, clicked_on_like=like_clicked,
+                                       is_private=private_user)
+            if like_clicked:
+                self.likes.set(self.likes.get() + 1)
+                self.check_limit_exceeded()
+            if post_seen:
+                self.tap_on_back()  # to user view
+                self.sleep_half()
+            self.tap_on_back()  # to follower view
 
     def run(self, *args, **kwargs):
         copy_of_last_ocr_result = ''
@@ -343,6 +359,7 @@ class WorkerThread(threading.Thread):
                 if black_heart_y > 0:
                     self.device.shell(f'input tap 91 {black_heart_y}')
                     self.likes.set(self.likes.get() + 1)
+                    self.check_limit_exceeded()
                     self.device.shell(f'input touchscreen swipe 500 {black_heart_y} 500 100 1000')
                     self.screenshot()
                 else:
