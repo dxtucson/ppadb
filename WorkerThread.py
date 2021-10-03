@@ -13,7 +13,7 @@ import sqlite3
 import datetime
 
 # Instagram has a limit of 1000 per 24 hours
-likes_per_day_limit = 950
+likes_per_day_limit = 500
 days_before_revisit = 100
 
 
@@ -225,7 +225,7 @@ class WorkerThread(threading.Thread):
         first_y = -1
         continuous_black_pixels = 0
         for row in range(numpy.shape(vertical_slice)[0]):
-            if (vertical_slice[row] == [38, 38, 38, 255]).all():
+            if (vertical_slice[row] == [0, 0, 0, 255]).all():
                 if first_y == -1:
                     first_y = row
                 continuous_black_pixels += 1
@@ -234,13 +234,13 @@ class WorkerThread(threading.Thread):
                     continuous_black_pixels = 0
             elif (vertical_slice[row] == [255, 255, 255, 255]).all():
                 if continuous_black_pixels == 4:
-                    if (self.current_screen[first_y + 240, 240] == self.current_screen[first_y + 240, 720]).all() and (
-                            self.current_screen[first_y + 240, 720] == self.current_screen[first_y + 240, 1200]).all():
-                        if (self.current_screen[first_y + 240, 240] == [239, 239, 239, 255]).all():
-                            return first_y + 240
-                        else:
-                            return -1
-                    return first_y + 240  # center_Y of the first image
+                    horizontal_slice = self.current_screen[first_y, 0:300]
+                    # count 300 pixel to confirm the black line
+                    if (horizontal_slice == [0, 0, 0, 255]).all():
+                        return first_y + 240  # center_Y of the first image
+                    else:
+                        first_y = -1
+                        continuous_black_pixels = 0
         return first_y
 
     def tap_on_back(self):
