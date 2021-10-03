@@ -13,7 +13,7 @@ import sqlite3
 import datetime
 
 # Instagram has a limit of 1000 per 24 hours
-likes_per_day_limit = 500
+likes_per_day_limit = 950
 days_before_revisit = 100
 
 
