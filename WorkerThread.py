@@ -237,7 +237,7 @@ class WorkerThread(threading.Thread):
                     horizontal_slice = self.current_screen[first_y, 0:300]
                     # count 300 pixel to confirm the black line
                     if (horizontal_slice == [0, 0, 0, 255]).all():
-                        return first_y + 240  # center_Y of the first image
+                        return first_y + 10  # center_Y of the first image
                     else:
                         first_y = -1
                         continuous_black_pixels = 0
@@ -314,7 +314,11 @@ class WorkerThread(threading.Thread):
                     red_heart_y = self.find_red_heart()
                     if red_heart_y < 0:  # Never liked this post
                         black_heart_y = self.find_black_heart()
-                        if black_heart_y > 1300:
+                        if black_heart_y < 0:
+                            self.device.shell(f'input touchscreen swipe 500 2536 500 1200 1000')
+                            self.screenshot()
+                            black_heart_y = self.find_black_heart()
+                        if black_heart_y > 0:
                             self.device.shell(f'input tap 91 {black_heart_y}')
                             like_clicked = True
                             self.screenshot()
