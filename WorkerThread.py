@@ -285,6 +285,7 @@ class WorkerThread(threading.Thread):
                 self.pause_for_a_sec()
             self.device.shell(f'input tap {self.half_width} {y}')  # tap on user
             self.sleep1()
+            self.sleep1()
             self.sleep_half()
             self.screenshot()
 
@@ -338,7 +339,6 @@ class WorkerThread(threading.Thread):
                 self.check_limit_exceeded()
             if post_seen:
                 self.tap_on_back()  # to user view
-                self.sleep_half()
             self.tap_on_back()  # to follower view
 
     def run(self, *args, **kwargs):
